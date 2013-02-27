@@ -208,6 +208,3 @@ F3 = Factor(name='Factor 3', var=[V3], cond=[V2], CPDs=[0.39, 0.61, 0.06, 0.94])
 
 for j in range(F3.pcard[0]):
     print j, F3.index2ass(j), F3.ass2index(F3.index2ass(j))
-
-
->>>>>>> 191be8a... v 0.02
