@@ -11,64 +11,116 @@
 #--------------------------------------------
 #!/usr/bin/env python
 
-class Variable:
+class consiable:
     name=""             # имя переменной
     value=[]            # значения переменной
+    factors=[]          # факторы, в которые входит данная переменная
+    parents=[]
+    childs=[]
+    card = 0            # мощность переменной
+    PD = None
     def __init__(self, name, a):
         self.name = name
+        self.factors=[]
+        self.parents=[]
+        self.childs=[]
         if  (type(a)==int):
+            self.card = a
             for i in range(a):
                 self.value.append(i)
         elif(type(a)==list):
             self.value = a
+            self.card = len(a)
+        self.PD=[]
+
     def find_value(self, val):
         for j in range(len(self.value)):
             if self.value[j]==val:
                 return j
     def __repr__(self):
         return self.name
+    def get_PD(self):     # TODO: implement
+        if self.PD==None:
+            f = None
+            for factor in self.factors:
+                if factor.cons == [self]:
+                    f = factor
+            for v in list(set(f.var) - set([self])):
+                f = f - v
+            self.PD = f.CPDs
+        return self.PD
 
-class BinaryVariable(Variable):
+class Binaryconsiable(consiable):
     def __init__(self, name):
         self.name = name
         self.value=[0, 1]
+        self.card = 2
+        self.factors = []
+        self.parents=[]
+        self.childs=[]
+        self.PD = None
 
 class Factor:
+    cons=[]             # переменная-результат
+    cond=[]             # переменные-условия
     var=[]              # переменные, входящие в фактор
     CPDs=[]             # условные вероятности
     card=[]             # вектор разрядности переменных
     pcard=[]            # кумулятивная общая разрядность
     name=''
-    def __init__(self, name='', var=[], CPDs=[]):
-        self.var = var
-        self.CPDs = CPDs
+    def __init__(self, name='', cons=[], cond=[], CPDs=[]):
+        self.cons = cons
+        self.CPDs = CPDs    # TODO: validate CPD cardinality and sums
         self.card=[]
         self.pcard=[]
         self.name=name
-        for i in self.var:
-            self.card.append(len(i.value))
+        self.cond=cond
+        self.var=self.cons + self.cond
+
+        for i in self.cons:
+            i.factors.append(self)
+            self.card.append(i.card)
+        for i in self.cond:
+            self.card.append(i.card)
+            i.factors.append(self)
+            for j in self.cons:
+                i.childs.append(j)
+                j.parents.append(i)
+
         for i in range(len(self.card)):
-            self.pcard.append( reduce(lambda x, y: x*y, self.card[i:], 1) )
+            self.pcard.append(
+                reduce(lambda x, y: x*y, self.card[i:], 1) )
         self.pcard.append(1)
     def __repr__(self):
         res=self.name+':\n'
-        for j in self.var:
-            res+='\t'+j.name+'\n'
+        res+="\tVariables:\n"
+        for i in self.cons:
+            res+='\t\t'+i.name+'\n'
+        res+="\tConditioned on:\n"
+        for j in self.cond:
+            res+='\t\t'+j.name+'\n'
+        res+="\tCPDs:\n"
+        for j in range(len(self.CPDs)):
+            res+='\t\t'
+            for i in self.index2ass(j):
+                res+=str(i)+", "
+            res+=str(self.CPDs[j])+'\n';
         return res
     def __mul__(self, other):
-        res=Factor(var=list(set(self.var) | set(other.var)))
+        res=Factor(cons=list(set(self.var) | set(other.var)))
         res.name = 'Product'
-        print res.pcard
         N = res.pcard[0]
         mapX={}
         mapY={}
         for i in range(len(res.var)):
             for j in range(len(self.var)):
                 if (res.var[i].name==self.var[j].name):
-                    mapX[j]=i
+                    mapX[i]=j
             for j in range(len(other.var)):
                 if (res.var[i].name==other.var[j].name):
-                    mapY[j]=i
+                    mapY[i]=j
+        print mapX
+        print mapY
         res.CPDs=[]
         for n in range(N):
             ass = res.index2ass(n)
@@ -79,7 +131,12 @@ class Factor:
                     assX.append(ass[j])
                 if j in mapY.keys():
                     assY.append(ass[j])
-            res.CPDs.append(  self.CPDs[self.ass2index(assX)] * other.CPDs[other.ass2index(assY)] )
+            print ass, assX, assY
+            res.CPDs.append(  self.CPDs[self.ass2index(assX)] *
+                              other.CPDs[other.ass2index(assY)] )
+            print self.CPDs[self.ass2index(assX)] * other.CPDs[other.ass2index(assY)],
+            print self.CPDs[self.ass2index(assX)],
+            print other.CPDs[other.ass2index(assY)]
         return res
     def ass2index(self, assignment):
         j=0
@@ -90,7 +147,7 @@ class Factor:
         return res
     def index2ass(self, index):
         res=[]
-        for j in range(len(self.var)):
+        for j in range(len(self.card)):
             res.append(index % self.card[-(j+1)])
             index=(index - (index % self.card[-(j+1)])) / self.card[-(j+1)]
         return res[::-1]
@@ -98,29 +155,51 @@ class Factor:
         m=0
         for i in range(len(self.var)):
             if (self.var[i]==var): m=i
-        res = Factor('Reduced factor', var=list(set(self.var) - set([var])))
+        res = Factor('Reduced factor',
+                        cons = self.cons,
+                        cond=list(set(self.cond) - set([var])))
+        mapX={}
+        mapY={}
+        for i in range(len(self.var)):
+            for j in range(len(res.var)):
+                if (res.var[j].name==self.var[i].name):
+                    mapX[i]=j
+            if (self.var[i].name==var.name):
+                    mapY[i]=j
+##        print mapX
+##        print mapY
         for i in range(len(res.pcard)):
             res.CPDs.append(0)
-##        print res.CPDs
         for i in range(len(self.CPDs)):
             ass = self.index2ass(i)
-            ass1 = ass[0:m-1] + ass[m:len(ass)]
-            i1 = res.ass2index(ass1)
-##            print i, ass, ass1, i1
-##            print res.CPDs[i1],
-##            print self.CPDs[i]
-            res.CPDs[i1] += self.CPDs[i]    # TODO: умножить на вероятность
+            assX=[]
+            assY=[]
+            for j in range(len(ass)):
+                if j in mapX.keys():
+                    assX.append(ass[j])
+                if j in mapY.keys():
+                    assY.append(ass[j])
+##            print ass, assX, assY
+##            print self.CPDs[i], var.get_PD()[assY[0]]
+            i1 = res.ass2index(assX)
+            res.CPDs[i1] += self.CPDs[i]*var.get_PD()[assY[0]]
         return res
 
-V1 = BinaryVariable("Variable 1");
-V2 = BinaryVariable("Variable 2");
-V3 = BinaryVariable("Variable 3");
+E = Binaryconsiable("Eartquake");
+B = Binaryconsiable("Burglary");
+A = Binaryconsiable("Alarm");
+R = Binaryconsiable("Radio");
 
-F1 = Factor(name='Factor 1', var=[V1],     CPDs=[0.11, 0.89]);
-F2 = Factor(name='Factor 2', var=[V2, V1], CPDs=[0.59, 0.41, 0.22, 0.78]);
-F3 = Factor(name='Factor 3', var=[V3, V2], CPDs=[0.39, 0.61, 0.06, 0.94]);
+F1 = Factor(name='EarthQake', cons=[E],      CPDs=[0.99, 0.01]);
+F2 = Factor(name='Burglary', cons=[B],       CPDs=[0.99, 0.01]);
+F3 = Factor(name='Radio', cons=[R], cond=[E],CPDs=[0.99, 0.01, 0.01, 0.99]);
+F4 = Factor(name='Alarm', cons=[A], cond=[E, B],CPDs=[0.99, 0.01, 0.01, 0.99]);
 
-##for j in range(F3.pcard[0]):
-##    print j, F3.index2ass(j), F3.ass2index(F3.index2ass(j))
+##print F3-E
+##print F3.ass2index(F3.index2ass(3))
+##for i in range(F3.pcard[0]):
+##    print i, F3.index2ass(i), F3.ass2index(F3.index2ass(i))
 
-print (F2 - V1).CPDs
+print E.get_PD()
+print F3 - E
+print R.get_PD()
