@@ -170,11 +170,14 @@ class Factor:
         mapY = self.map([var])
         for i in range(res.pcard[0]):
             res.CPDs.append(0)
-        for i in range(len(res.CPDs)):
+        for i in range(len(self.CPDs)):
             assX = self.ass(i, mapX)
             assY = self.ass(i, mapY)[0]
             i1 = res.ass2index(assX)
+##            print i, assX, assY, i1
+##            print res.CPDs[i1], self.CPDs[i], var.get_PD()[var.find_value(assY)], self.CPDs[i]*var.get_PD()[var.find_value(assY)]
             res.CPDs[i1] += self.CPDs[i]*var.get_PD()[var.find_value(assY)]
+##            print i, i1, res.CPDs[i1]
         return res
     def __div__(self, other):
         res = Factor(name='Division',
@@ -183,12 +186,16 @@ class Factor:
                         CPDs=[])
         mapX = self.map(res.var)
         mapY = self.map(res.cond)
-        print mapX, mapY
         for i in range(res.pcard[0]):
             res.CPDs.append(0)
+        print res.cons, res.cond
+        print self.cons, other.cons
         for i in range(len(self.CPDs)):
             assX = res.ass(i, mapX)
             assY = res.ass(i, mapY)
+            print assX, assY
+            print self.CPDs[res.ass2index(assX)]
+            print other.CPDs[other.ass2index(assY)]
             res.CPDs[i] = self.CPDs[self.ass2index(assX)] / other.CPDs[other.ass2index(assY)]
         return res
 
@@ -197,27 +204,38 @@ B = Variable("Burglary",  ['safe', 'robbed']);
 A = Variable("Alarm", ['quiet', 'loud']);
 R = Variable("Radio", ["off", "on"])
 
-F1 = Factor(name='E', cons=[E],      CPDs=[0.99, 0.01]);
+F1 = Factor(name='E', cons=[E],      CPDs=[0.999, 0.001]);
 F2 = Factor(name='B', cons=[B],       CPDs=[0.99, 0.01]);
-F3 = Factor(name='R|E', cons=[R], cond=[E],CPDs=[0.99, 0.01, 0.01, 0.99]);
-F4 = Factor(name='A|E,B', cons=[A], cond=[E, B],CPDs=[0.99, 0.01, 0.01, 0.99, 0.99, 0.01, 0.01, 0.99]);
+F3 = Factor(name='R|E', cons=[R], cond=[E],CPDs=[0.9, 0.1, 0.2, 0.8]);
+F4 = Factor(name='A|E,B', cons=[A], cond=[E, B],
+        CPDs=[1, 0, 0.01, 0.99, 0.02, 0.98, 0, 1]);
 
-F5 = F3 - E
-F5.name = 'R'
-print F5
-F6 = F5 * F1
-F6.name = 'R,E'
+F6=F1*F2
 print F6
-print F5
-F7 = F6/F5
-F7.name = 'E|R'
-print F7
-print F3
-print F7 - R
+print F6/F1
+
+##F5 = F3 - E
+##F5.name = 'R'
+##print F5
+##F6 = F5 * F1
+##F6.name = 'R,E'
+##print F6
+##F7 = F6/F5
+##F7.name = 'E|R'
+##print F7
 
 ##print F3-E
 ##print F3.ass2index(F3.index2ass(3))
 ##for i in range(F3.pcard[0]):
 ##    print i, F3.index2ass(i), F3.ass2index(F3.index2ass(i))
 
+##C = Variable('Cancer', ['yes', 'no'])
+##T = Variable('Test', ['pos', 'neg'])
+##
+##F11 = Factor(name='C', cons=[C], CPDs=[0.0001, 0.9999])
+##F12 = Factor(name='T|C', cons=[T], cond=[C], CPDs=[0.9, 0.1, 0.2, 0.8])
+##F14 = (F12 - C) * F11
+##F14.name='C,T'
+##F15 = F14/(F12 - C)
+##F15.name='C|T'
 
