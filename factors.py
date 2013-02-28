@@ -11,46 +11,54 @@
 #--------------------------------------------
 #!/usr/bin/env python
 
-class consiable:
+class Variable:
     name=""             # имя переменной
     value=[]            # значения переменной
     factors=[]          # факторы, в которые входит данная переменная
     parents=[]
     childs=[]
     card = 0            # мощность переменной
-    PD = None
+    PD = None           # безусловная вероятность данной переменной
+
     def __init__(self, name, a):
         self.name = name
         self.factors=[]
         self.parents=[]
         self.childs=[]
-        if  (type(a)==int):
+        if  (type(a)==int):     # cardinality passed
             self.card = a
             for i in range(a):
                 self.value.append(i)
-        elif(type(a)==list):
+        elif(type(a)==list):    # values list passed
             self.value = a
             self.card = len(a)
-        self.PD=[]
+        self.PD=None
 
     def find_value(self, val):
+        # given value finds its number among variable's values
         for j in range(len(self.value)):
             if self.value[j]==val:
                 return j
+
     def __repr__(self):
         return self.name
-    def get_PD(self):     # TODO: implement
+
+    def get_PD(self):
+        # calculates probability distribution w/ no conditions
         if self.PD==None:
+            # find a factor contains this var as cons
             f = None
             for factor in self.factors:
                 if factor.cons == [self]:
                     f = factor
+            # marginalize all other vars from this factor
             for v in list(set(f.var) - set([self])):
                 f = f - v
+            # and extract PD from this reduced factor's CPD
             self.PD = f.CPDs
         return self.PD
 
-class Binaryconsiable(consiable):
+class BinaryVariable(Variable):
     def __init__(self, name):
         self.name = name
         self.value=[0, 1]
@@ -76,21 +84,22 @@ class Factor:
         self.name=name
         self.cond=cond
         self.var=self.cons + self.cond
-
         for i in self.cons:
-            i.factors.append(self)
-            self.card.append(i.card)
-        for i in self.cond:
-            self.card.append(i.card)
-            i.factors.append(self)
-            for j in self.cons:
+            i.factors.append(self)      # adds self to each variable' factor list
+            self.card.append(i.card)    # builds factor's cardinality list from var's cardinalities
+        for i in self.cond:         # in case of conditioning
+            self.card.append(i.card)    # continues factor'a cardinality list
+            i.factors.append(self)      # adds self to variables' factor list
+            for j in self.cons:     # builds variables' hierarchy
                 i.childs.append(j)
                 j.parents.append(i)
-
+        # counts cumulative cardinality
         for i in range(len(self.card)):
             self.pcard.append(
                 reduce(lambda x, y: x*y, self.card[i:], 1) )
-        self.pcard.append(1)
+        self.pcard.append(1)    # for compatibility
+        # actually forgot how it workes. However, tested
+
     def __repr__(self):
         res=self.name+':\n'
         res+="\tVariables:\n"
@@ -101,42 +110,42 @@ class Factor:
             res+='\t\t'+j.name+'\n'
         res+="\tCPDs:\n"
         for j in range(len(self.CPDs)):
-            res+='\t\t'
+            res+='\t\t'+str(j)+'->'
             for i in self.index2ass(j):
                 res+=str(i)+", "
             res+=str(self.CPDs[j])+'\n';
         return res
+
+    def map(self, lst):
+        # bulds a map: hash table,
+        # where keys - indecies of THIS factor's assingment list
+        # and values - indecies of given var list assignment, corresponding to key
+        m={}
+        for i in range(len(self.var)):
+            for j in range(len(lst)):
+                if (self.var[i]==lst[j]):
+                    m[i]=j
+        return m
+    def ass(self, n, mp):
+        # given number of assignment, computes
+        ass = self.index2ass(n)
+        res = []
+        for i in range(len(ass)):
+            if i in mp.keys():
+                res.append(ass[i])
+        return res
     def __mul__(self, other):
-        res=Factor(cons=list(set(self.var) | set(other.var)))
-        res.name = 'Product'
-        N = res.pcard[0]
-        mapX={}
-        mapY={}
-        for i in range(len(res.var)):
-            for j in range(len(self.var)):
-                if (res.var[i].name==self.var[j].name):
-                    mapX[i]=j
-            for j in range(len(other.var)):
-                if (res.var[i].name==other.var[j].name):
-                    mapY[i]=j
-        print mapX
-        print mapY
+        res=Factor(name='Product', cons=list(set(self.var) | set(other.var)),
+                    cond=[],
+                    CPDs=[])
+        mapX=res.map(self.var)
+        mapY=res.map(other.var)
         res.CPDs=[]
-        for n in range(N):
-            ass = res.index2ass(n)
-            assX=[]
-            assY=[]
-            for j in range(len(ass)):
-                if j in mapX.keys():
-                    assX.append(ass[j])
-                if j in mapY.keys():
-                    assY.append(ass[j])
-            print ass, assX, assY
+        for n in range(res.pcard[0]):
+            assX = res.ass(n, mapX)
+            assY = res.ass(n, mapY)
             res.CPDs.append(  self.CPDs[self.ass2index(assX)] *
                               other.CPDs[other.ass2index(assY)] )
-            print self.CPDs[self.ass2index(assX)] * other.CPDs[other.ass2index(assY)],
-            print self.CPDs[self.ass2index(assX)],
-            print other.CPDs[other.ass2index(assY)]
         return res
     def ass2index(self, assignment):
         j=0
@@ -148,58 +157,67 @@ class Factor:
     def index2ass(self, index):
         res=[]
         for j in range(len(self.card)):
-            res.append(index % self.card[-(j+1)])
+            res.append(self.var[j].value[index % self.card[-(j+1)]])
             index=(index - (index % self.card[-(j+1)])) / self.card[-(j+1)]
-        return res[::-1]
+        return res
     def __sub__(self, var):
-        m=0
-        for i in range(len(self.var)):
-            if (self.var[i]==var): m=i
+##        print "Marginalizing factor", self.name, "wrt", var.name
         res = Factor('Reduced factor',
                         cons = self.cons,
-                        cond=list(set(self.cond) - set([var])))
-        mapX={}
-        mapY={}
-        for i in range(len(self.var)):
-            for j in range(len(res.var)):
-                if (res.var[j].name==self.var[i].name):
-                    mapX[i]=j
-            if (self.var[i].name==var.name):
-                    mapY[i]=j
-##        print mapX
-##        print mapY
-        for i in range(len(res.pcard)):
+                        cond = list(set(self.cond) - set([var])),
+                        CPDs=[])
+        mapX = self.map(res.var)
+        mapY = self.map([var])
+        for i in range(res.pcard[0]):
+            res.CPDs.append(0)
+        for i in range(len(res.CPDs)):
+            assX = self.ass(i, mapX)
+            assY = self.ass(i, mapY)[0]
+            i1 = res.ass2index(assX)
+            res.CPDs[i1] += self.CPDs[i]*var.get_PD()[var.find_value(assY)]
+        return res
+    def __div__(self, other):
+        res = Factor(name='Division',
+                        cons=list(set(self.cons) - set(other.cons)),
+                        cond=list(set(self.cons) & set(other.cons)),
+                        CPDs=[])
+        mapX = self.map(res.var)
+        mapY = self.map(res.cond)
+        print mapX, mapY
+        for i in range(res.pcard[0]):
             res.CPDs.append(0)
         for i in range(len(self.CPDs)):
-            ass = self.index2ass(i)
-            assX=[]
-            assY=[]
-            for j in range(len(ass)):
-                if j in mapX.keys():
-                    assX.append(ass[j])
-                if j in mapY.keys():
-                    assY.append(ass[j])
-##            print ass, assX, assY
-##            print self.CPDs[i], var.get_PD()[assY[0]]
-            i1 = res.ass2index(assX)
-            res.CPDs[i1] += self.CPDs[i]*var.get_PD()[assY[0]]
+            assX = res.ass(i, mapX)
+            assY = res.ass(i, mapY)
+            res.CPDs[i] = self.CPDs[self.ass2index(assX)] / other.CPDs[other.ass2index(assY)]
         return res
 
-E = Binaryconsiable("Eartquake");
-B = Binaryconsiable("Burglary");
-A = Binaryconsiable("Alarm");
-R = Binaryconsiable("Radio");
+E = Variable("Eartquake", ['still', 'shake']);
+B = Variable("Burglary",  ['safe', 'robbed']);
+A = Variable("Alarm", ['quiet', 'loud']);
+R = Variable("Radio", ["off", "on"])
 
-F1 = Factor(name='EarthQake', cons=[E],      CPDs=[0.99, 0.01]);
-F2 = Factor(name='Burglary', cons=[B],       CPDs=[0.99, 0.01]);
-F3 = Factor(name='Radio', cons=[R], cond=[E],CPDs=[0.99, 0.01, 0.01, 0.99]);
-F4 = Factor(name='Alarm', cons=[A], cond=[E, B],CPDs=[0.99, 0.01, 0.01, 0.99]);
+F1 = Factor(name='E', cons=[E],      CPDs=[0.99, 0.01]);
+F2 = Factor(name='B', cons=[B],       CPDs=[0.99, 0.01]);
+F3 = Factor(name='R|E', cons=[R], cond=[E],CPDs=[0.99, 0.01, 0.01, 0.99]);
+F4 = Factor(name='A|E,B', cons=[A], cond=[E, B],CPDs=[0.99, 0.01, 0.01, 0.99, 0.99, 0.01, 0.01, 0.99]);
+
+F5 = F3 - E
+F5.name = 'R'
+print F5
+F6 = F5 * F1
+F6.name = 'R,E'
+print F6
+print F5
+F7 = F6/F5
+F7.name = 'E|R'
+print F7
+print F3
+print F7 - R
 
 ##print F3-E
 ##print F3.ass2index(F3.index2ass(3))
 ##for i in range(F3.pcard[0]):
 ##    print i, F3.index2ass(i), F3.ass2index(F3.index2ass(i))
 
-print E.get_PD()
-print F3 - E
-print R.get_PD()
+
