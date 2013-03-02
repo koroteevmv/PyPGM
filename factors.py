@@ -1,22 +1,26 @@
 # -*- coding: UTF-8 -*-
-#--------------------------------------------
-# Name:        модуль1
-# Purpose:
-#
-# Author:      Admin
-#
-# Created:     15.10.2012
-# Copyright:   (c) Admin 2012
-# Licence:     <your licence>
-#--------------------------------------------
 #!/usr/bin/env python
+#--------------------------------------------
+# Name:        PyPGM
+# Author:      sejros
+# Created:     15.10.2012
+# Copyright:   (c) sejros 2012
+# Licence:     GNU GPL
+#--------------------------------------------
 
 class Variable:
+    '''
+    Syntax:
+            E = Variable("Eartquake", ['still', 'shake']);
+            B = Variable("Burglary",  ['safe', 'robbed']);
+            A = Variable("Alarm", ['quiet', 'loud']);
+            R = Variable("Radio", ['off', 'on'])
+    '''
     name=""             # имя переменной
     value=[]            # значения переменной
     factors=[]          # факторы, в которые входит данная переменная
-    parents=[]
-    childs=[]
+    parents = []
+    childs = []
     card = 0            # мощность переменной
     PD = None           # безусловная вероятность данной переменной
 
@@ -65,6 +69,19 @@ class BinaryVariable(Variable):
         self.PD = None
 
 class Factor:
+    '''
+    Syntax:
+            E = Variable("Eartquake", ['still', 'shake']);
+            B = Variable("Burglary",  ['safe', 'robbed']);
+            A = Variable("Alarm", ['quiet', 'loud']);
+            R = Variable("Radio", ['off', 'on'])
+
+            F1 = Factor(name='E', var=[E],       CPDs=[0.999, 0.001]);
+            F2 = Factor(name='B', var=[B],       CPDs=[0.99, 0.01]);
+            F3 = Factor(name='R|E', var=[R,E],   CPDs=[0.9, 0.2, 0.1, 0.8]);
+            F4 = Factor(name='A|E,B', var=[A,E,B],
+                    CPDs=[1.0, 0.0, 0.01, 0.99, 0.02, 0.98, 0.0, 1.0]);
+    '''
     var=[]              # переменные, входящие в фактор
     CPDs=[]             # условные вероятности
     card=[]             # вектор разрядности переменных
@@ -75,11 +92,9 @@ class Factor:
         self.pcard=[]
         self.name=name
         self.var=var
-##        self.var=var[::-1]
         self.card=[]
         for i in self.var:
             self.card.append(i.card)
-##            print "adding to", self.name, "var", i.name, i.card
 ##        for i in self.cons:
 ##            i.factors.append(self)              # adds self to each variable' factor list
 ##            self.card.append(i.card)            # builds factor's cardinality list from var's cardinalities
@@ -89,7 +104,6 @@ class Factor:
 ##            for j in self.cons:                 # builds variables' hierarchy
 ##                i.childs.append(j)
 ##                j.parents.append(i)
-##        self.card = self.card[::-1]
         # counts cumulative cardinality
         for i in range(len(self.var)):
             self.pcard.append(
@@ -102,9 +116,6 @@ class Factor:
         res+="\tScope:\n"
         for i in self.var:
             res+='\t\t'+i.name+'\n'
-##        res+="\tConditioned on:\n"
-##        for j in self.cond:
-##            res+='\t\t'+j.name+'\n'
         res+="\tCPDs:\n"
         for j in range(len(self.CPDs)):
             res+='\t\t'+str(j)+'->'
@@ -125,6 +136,7 @@ class Factor:
                 if (self.var[i]==lst[j]):
                     m[i]=j
         return m
+        
     def ass(self, n, mp):
         '''
         given number of assignment, computes
@@ -139,6 +151,7 @@ class Factor:
             if i in mp.keys():
                 res[mp[i]] = ass[i]
         return res
+        
     def ass2index(self, assignment):
         '''
         given a list of values of factor's vars
@@ -153,6 +166,7 @@ class Factor:
             res+=v.find_value(assignment[j])*self.pcard[j+1]
             j+=1
         return res
+        
     def index2ass(self, index):
         '''
         given a number computes an assignment -
@@ -163,24 +177,34 @@ class Factor:
         '''
         res=[]
         for j in range(len(self.var)):
-            res.append(self.var[j].value[index % self.card[j]])
-            index=(index - (index % self.card[j])) / self.card[j]
-        return res
+            res.append(self.var[-j-1].value[index % self.card[-j-1]])
+            index=(index - (index % self.card[-j-1])) / self.card[-j-1]
+        return res[::-1]
+        
     def __mul__(self, other):
         '''
         computes product of factors
         F(A,C)*F(C,B) = F(A,B,C)
-        #TODO: F(A|B)*F(B) = F(A,B) ???
+
+        Syntax:
+                A = Variable('A', [1, 2, 3])
+                B = Variable('B', [1, 2])
+                C = Variable('C', [1, 2])
+                F1 = Factor(name='A,B', var=[A,B],
+                            CPDs=[0.5, 0.8, 0.1, 0, 0.3, 0.9])
+                F2 = Factor(name='B,C', var=[B,C],
+                            CPDs=[0.5, 0.7, 0.1, 0.2])
+                # factor product
+                F3 = F1*F2
+                F3.name = 'A,B,C'
+                print F3
         '''
         res=Factor(name='Product',
                     var=list(set(self.var) | set(other.var)),
                     CPDs=[])
-        mapS=res.map(self.var)
-        mapO=res.map(other.var)
-##        print self.var, other.var
-##        print res.var
-##        print mapS, mapO
-        res.CPDs=[]
+        mapS = res.map(self.var)
+        mapO = res.map(other.var)
+        res.CPDs = []
         for i in range(res.pcard[0]):
             res.CPDs.append(0)
         for n in range(res.pcard[0]):
@@ -188,57 +212,86 @@ class Factor:
             Si = self.ass2index(assS)
             assO = res.ass(n, mapO)
             Oi = other.ass2index(assO)
-##            print assS, Si, assO, Oi
-            res.CPDs[n]=(self.CPDs[Si]*other.CPDs[Oi])
+            res.CPDs[n] = (self.CPDs[Si] * other.CPDs[Oi])
         return res
-    def __sub__(self, other):
+        
+    def marginal(self, var=None):
         '''
         perfoms a factor marginalization
-        F(A,B,C)-F(B) = F(A,C)
+        F(A,B,C)-B = F(A,C)
+
+        Syntax:
+                A = Variable('A', [1, 2, 3])
+                B = Variable('B', [1, 2])
+                C = Variable('C', [1, 2])
+                F1 = Factor(name='A,B', var=[A,B],
+                            CPDs=[0.5, 0.8, 0.1, 0, 0.3, 0.9])
+                F2 = Factor(name='B,C', var=[B,C],
+                            CPDs=[0.5, 0.7, 0.1, 0.2])
+                # factor product
+                F3 = F1*F2
+                F3.name = 'A,B,C'
+                print F3
+                # factor marginalization
+                F4 = F3.marginal(B)
+                F4.name = 'A,C'
+                print F4
         '''
+        if not var in self.var:
+            raise AttributeError()
+            
         res = Factor('Marginal factor',
-                        cons = list(set(self.var) - set(other.var)),
-                        cond=[],
+                        var = list(set(self.var) - set([var])),
                         CPDs=[])
         mapX = self.map(res.var)
-        mapY = self.map(other.var)
-        print self.var, other.var, res.var
-        print mapX, mapY
+        for i in range(res.pcard[0]):
+            res.CPDs.append(0)
+        for i in range(len(self.CPDs)):
+            assX = self.ass(i, mapX)
+            i1 = res.ass2index(assX)
+            res.CPDs[i1] += self.CPDs[i]
+        return res
+        
+    def reduce(self, var=None, value=''):
+        '''
+        computes a factor reduction
+        F(A,B)/F(B) = F(A|B)
+
+        Syntax:
+                A = Variable('A', [1, 2, 3])
+                B = Variable('B', [1, 2])
+                C = Variable('C', [1, 2])
+                F1 = Factor(name='A,B', var=[A,B],
+                            CPDs=[0.5, 0.8, 0.1, 0, 0.3, 0.9])
+                F2 = Factor(name='B,C', var=[B,C],
+                            CPDs=[0.5, 0.7, 0.1, 0.2])        
+                # factor product
+                F3 = F1*F2
+                F3.name = 'A,B,C'
+                # factor reduction
+                F4 = F3.reduce(var=C, value=1)
+                F4.name = 'A,B'
+                print F4
+        '''
+        if not var in self.var:
+            raise AttributeError()
+            
+        res = Factor(name='Reduced',
+                        var = list(set(self.var) - set([var])),
+                        CPDs=[])
+        mapX = self.map(res.var)
+        mapY = self.map([var])
         for i in range(res.pcard[0]):
             res.CPDs.append(0)
         for i in range(len(self.CPDs)):
             assX = self.ass(i, mapX)
             assY = self.ass(i, mapY)
             i1 = res.ass2index(assX)
-            print i, assX, assY, self.index2ass(i1)
-            res.CPDs[i1] += self.CPDs[i]#*var.get_PD()[var.find_value(assY)]
-##            print i, i1, res.CPDs[i1]
+            if assY[0]==value:
+                res.CPDs[i1] = self.CPDs[i]
         return res
-    def __div__(self, other):
-        '''
-        computes a factor division
-        F(A,B)/F(B) = F(A|B)
-        '''
-        res = Factor(name='Division',
-                        cons=list(set(self.cons) - set(other.cons)),
-                        cond=list(set(self.cons) & set(other.cons)),
-                        CPDs=[])
-        mapX = self.map(res.var)
-        mapY = self.map(res.cond)
-        for i in range(res.pcard[0]):
-            res.CPDs.append(0)
-##        print res.cons, res.cond
-##        print self.var, other.cons
-##        print mapX, mapY
-        for i in range(len(self.CPDs)):
-            assX = self.ass(i, mapX)
-            assY = self.ass(i, mapY)
-##            print assX, assY
-##            print self.CPDs[self.ass2index(assX)],
-##            print other.CPDs[other.ass2index(assY)]
-            res.CPDs[i] = self.CPDs[self.ass2index(assX)] / other.CPDs[other.ass2index(assY)]
-        return res
-
+        
+"""
     def revert(self):
         '''
         given factor A,B|C,D computes C,D|A,B
@@ -263,20 +316,83 @@ class Factor:
                                 CPDs=cons.get_PD())
             res = res/f_cons
         return res
+"""
+
+class CPD(Factor):
+    """ Class doc """
+    cons=[]
+    cond=[]
+        
+    def __init__(self, name='', cons=[], cond=[], CPDs=[]):
+        self.CPDs = CPDs    # TODO: validate CPD cardinality and sums
+        self.pcard=[]
+        self.name=name
+        self.cons = cons
+        self.cond = cond
+        self.var = cons + cond
+        self.card=[]
+        for i in self.var:
+            self.card.append(i.card)
+        for i in self.cons:
+            i.factors.append(self)              # adds self to each variable' factor list
+            self.card.append(i.card)            # builds factor's cardinality list from var's cardinalities
+        for i in self.cond:                     # in case of conditioning
+            self.card.append(i.card)            # continues factor'a cardinality list
+            i.factors.append(self)              # adds self to variables' factor list
+            for j in self.cons:                 # builds variables' hierarchy
+                i.childs.append(j)
+                j.parents.append(i)
+        # counts cumulative cardinality
+        for i in range(len(self.var)):
+            self.pcard.append(
+                reduce(lambda x, y: x*y, self.card[i:], 1) )
+        self.pcard.append(1)    # for compatibility
+        # actually forgot how it workes. However, tested
+
+    def __repr__(self):
+        res=self.name+':\n'
+        res+="\tVariables:\n"
+        for i in self.cons:
+            res+='\t\t'+i.name+'\n'
+        res+="\tConditions:\n"
+        for i in self.cond:
+            res+='\t\t'+i.name+'\n'
+        res+="\tCPDs:\n"
+        for j in range(len(self.CPDs)):
+            res+='\t\t'+str(j)+'->'
+            for i in self.index2ass(j):
+                res+=str(i)+", "
+            res+=str(self.CPDs[j])+'\n';
+        return res
+
+class PD(Factor):
+    """ Class doc """
+    
+    def __init__ (self):
+        """ Class initialiser """
+        pass
+
+
 
 E = Variable("Eartquake", ['still', 'shake']);
 B = Variable("Burglary",  ['safe', 'robbed']);
 A = Variable("Alarm", ['quiet', 'loud']);
-R = Variable("Radio", ["off", "on"])
+R = Variable("Radio", ['off', 'on'])
 
 F1 = Factor(name='E', var=[E],       CPDs=[0.999, 0.001]);
 F2 = Factor(name='B', var=[B],       CPDs=[0.99, 0.01]);
-F3 = Factor(name='R|E', var=[R,E],   CPDs=[0.9, 0.1, 0.2, 0.8]);
+F3 = Factor(name='R|E', var=[R,E],   CPDs=[0.9, 0.2, 0.1, 0.8]);
 F4 = Factor(name='A|E,B', var=[A,E,B],
         CPDs=[1.0, 0.0, 0.01, 0.99, 0.02, 0.98, 0.0, 1.0]);
 
-##FullD = ((F4-E)-B)*F1*F2
-##print FullD
+#~ print F1
+#~ print F3
+#~ print F3*F1
+#~ print sum((F3*F1).CPDs)
+#~ print (F3*F1).marginal(R)
+#~ 
+#~ print F4
+
 ##print F4
 ##print F1
 ##F6=F4-F2
@@ -309,15 +425,17 @@ F4 = Factor(name='A|E,B', var=[A,E,B],
 ##F15.name='C|T'
 ##print F15
 
-
-##F12.revert()
-
 A = Variable('A', [1, 2, 3])
 B = Variable('B', [1, 2])
 C = Variable('C', [1, 2])
-F1 = Factor(name='F1', var=[A,B],
+F1 = Factor(name='A,B', var=[A,B],
             CPDs=[0.5, 0.8, 0.1, 0, 0.3, 0.9])
-F2 = Factor(name='F2', var=[B,C],
-            CPDs=[0.5, 0.7, 0.1, 0.2])
-
+F2 = Factor(name='B,C', var=[B,C],
+            CPDs=[0.5, 0.7, 0.1, 0.2])        
+# factor product
 F3 = F1*F2
+F3.name = 'A,B,C'
+# factor reduction
+F4 = F3.reduce(var=C, value=1)
+F4.name = 'A,B'
+print F4
