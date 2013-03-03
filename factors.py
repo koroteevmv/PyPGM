@@ -38,7 +38,9 @@ class Variable:
         self.PD=None
 
     def find_value(self, val):
-        # given value finds its number among variable's values
+        '''
+        given value finds its number among variable's values
+        '''
         for j in range(len(self.value)):
             if self.value[j]==val:
                 return j
@@ -86,16 +88,16 @@ class Factor:
         self.cond = []
         self.parents = []
         self.cons = None
-        if len(values)==0 and len(var)>0:
-            self.var = var
-        elif len(values)>0 and len(var)==0:
+        for factor in cond:
+            self.cond.append(factor.var[-1])
+            self.parents.append(factor)
+        if len(values)>0:
             if full=="":
                 full=name
-            self.cons = Variable(full, values)
-            for factor in cond:
-                self.cond.append(factor.var[-1])
-                self.parents.append(factor)        
-            self.var=self.cond+[self.cons]
+            self.cons = Variable(full, values)    
+            self.var=self.cond+var+[self.cons]
+        else:                
+            self.var=self.cond+var
         
         self.card=[]
         for i in self.var:
@@ -109,6 +111,7 @@ class Factor:
             if len(CPD)!=self.pcard[0]:
                 raise AttributeError("Cannot build conditioned factor: CPD cardinality doesn't match")
             tempf = self.marginal(self.var[-1])
+            # TODO: maybe delete this check (for unnormalized factors)
             for i in tempf.CPDs:
                 if i!=1.0:
                     raise AttributeError("Cannot build conditioned factor: CPD doesn't sum to 1")
@@ -293,7 +296,8 @@ class Factor:
             raise AttributeError()
 
         res = Factor(name='Conditional',
-                        var = self.var,
+                        var = list(set(self.var)-set(other.var)),
+                        cond = [other],
                         CPD=[])
         mapY = self.map([var])
         for i in range(res.pcard[0]):
@@ -313,7 +317,6 @@ class Factor:
             res+='\t\t'+i.name+'\n'
         if self.cons!=None:
             res+="\tVariable:\n"
-            
             res+='\t\t'+self.cons.name+'\n'
         res+="\tConditions:\n"
         for i in self.cond:
@@ -334,103 +337,54 @@ class Factor:
         return res
 
     def uncond(self):
-        res = self
+        res = self.joint()
         for fact in self.parents:
             res = res.marginal(fact.uncond().var[-1])
         return res
-
-class PD(Factor):
-    """
-    Class doc
-    """
-    var = None
-
-    def __init__ (self, name='', full="", values=[], CPD=[]):
-        """ Class initialiser """
-        if full=="":
-            full=name
-        self.name = name
-        if sum(CPD)!=1.0:
-            raise AttributeError("Cannot build unconditioned factor: PD doesn't sum to 1")
-        self.CPDs = CPD
-        self.var = [Variable(full, values)]
-        Factor.__init__(self, name=self.name, var=self.var, CPDs=self.CPDs)
-
-    def joint(self):
-        return self
-    def uncond(self):
-        return self
-
-class CPD(Factor):
-    """ Class doc """
-    cons=[]
-    cond=[]
-    parents=[]
-
-    def __init__(self, name='', full='', values=[], cond=[], CPD=[]):
-        '''
-        '''
-        if full=="":
-            full=name
-        self.cons = Variable(full, values)
-        self.cond = []
-        self.parents = []
-        for factor in cond:
-            self.cond.append(factor.var[-1])
-            self.parents.append(factor)
-        Factor.__init__(self, name=name, var=self.cond+[self.cons], CPDs=CPD)
-        if len(CPD)!=self.pcard[0]:
-            raise AttributeError("Cannot build conditioned factor: CPD cardinality doesn't match")
-        tempf = self.marginal(self.var[-1])
-        for i in tempf.CPDs:
-            if i!=1.0:
-                raise AttributeError("Cannot build conditioned factor: CPD doesn't sum to 1")
-
-    def __repr__(self):
-        res=self.name+':\n'
-        res+="\tVariable:\n"
-        res+='\t\t'+self.cons.name+'\n'
-        res+="\tConditions:\n"
-        for i in self.cond:
-            res+='\t\t'+i.name+'\n'
-        res+="\tCPDs:\n"
-        for j in range(len(self.CPDs)):
-            res+='\t\t'+str(j)+'->'
-            for i in self.index2ass(j):
-                res+=str(i)+", "
-            res+=str(self.CPDs[j])+'\n';
-        res+=str(self.sum())+'\n'
-        return res
-
-    def joint(self):
-        res = self;
-        for parent in self.parents:
-            res = res*parent.joint()
-        return res
-
-    def uncond(self):
-        res = self
-        for fact in self.parents:
-            res = res.marginal(fact.uncond().var[-1])
+        
+    def query(self, query=[], evidence=[]):
+        res = self.joint()
+        q = []
+        for qu in query:
+            q.append(qu.var[-1])
+        e = []
+        for qu in evidence:
+            q.append(qu.var[-1])
+        hidden=set(res.var) - set(q) - set(e)
+        for h in hidden:
+            res = res.marginal(h)
+        for e in evidence:
+            res = res / e.uncond()
         return res
 
 class Bayesian:
+    # TODO: maybe delete this class
     '''
     '''
     factors=[]
     def __init__(self, factors):
         self.factors = factors
     def joint(self):
-        res=None
+        res = None
         for fact in self.factors:
             res = fact*res
         return res
     def query(self, query=[], evidence=[]):
-        q=set([])
-        e=set([])
-        h=set([])
-        pass
+        res = self.joint()
+        q = []
+        for qu in query:
+            q.append(qu.var[-1])
+        e = []
+        for qu in evidence:
+            q.append(qu.var[-1])
+        hidden=set(res.var) - set(q) - set(e)
+        for h in hidden:
+            res = res.marginal(h)
+        for e in evidence:
+            res = res / e.uncond()
+        return res
 
+        
 # cancer example
 ##C = Variable('Cancer', ['yes', 'no'])
 ##T = Variable('Test', ['pos', 'neg'])
@@ -447,8 +401,8 @@ C = Factor(name='C', full="Cancer", values=["no", "yes"], CPD=[0.99, 0.01])
 T = Factor(name='T', full="Test", values=["pos", "neg"], cond=[C], CPD=[0.2, 0.8, 0.9, 0.1])
 #~ print T
 #~ print T.joint()
-#~ print T.joint().uncond()
-#~ print T.joint() / 
+#~ print T.uncond()
+#~ print T.joint() / T.uncond()
 
 
 # student example
@@ -467,9 +421,6 @@ F3 = Factor(name='G|I,D', var=[I, D, G], CPD=[ 0.3,  0.4,  0.3,
 F4 = Factor(name='S|I', var=[I,S], CPD=[0.95, 0.05, 0.2, 0.8])
 F5 = Factor(name='L|G', var=[G,L], CPD=[0.1, 0.9, 0.4, 0.6, 0.99, 0.01])
 
-#~ print F3
-#~ print F1*F2*F3*F4*F5
-
 D = Factor(name='D', values=[0,1], CPD=[0.6, 0.4], full="Difficulty")
 I = Factor(name='I', values=[0,1], CPD=[0.7, 0.3], full="Intelligence")
 G = Factor(name='G|I,D', values=[1, 2, 3], cond=[D,I], CPD=[0.3,  0.4,  0.3,
@@ -479,15 +430,9 @@ G = Factor(name='G|I,D', values=[1, 2, 3], cond=[D,I], CPD=[0.3,  0.4,  0.3,
                                                         full="Grade")
 S = Factor(name='S|I', values=[0, 1], cond=[I], CPD=[0.95, 0.05, 0.2, 0.8], full="SAT")
 L = Factor(name='L|G', values=[0, 1], cond=[G], CPD=[0.1, 0.9, 0.4, 0.6, 0.99, 0.01], full="Letter")
-#~ print (D*None)
-#~ print (D*I*S*G).marginal(var=D.var[-1])
-#~ print (D*I*S*G*L).reduce(var=L.var[-1], value=1).sum()
-#~ print L.joint()
-
 
 BN = Bayesian([D,I,S,G,L])
-print S
-print S.joint()
-print S.joint()*I
-print S.joint().marginal(var=S.var[0])
-print S.joint().marginal(var=S.var[0])*I
+print G.query(query=[G], evidence=[D])
+# TODO: test on larger nets with operands of marginal, reduce, __mul__, __div__ including more than one cons var
+# TODO: doctest everything
+# TODO: furthermore: local inference
