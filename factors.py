@@ -20,8 +20,6 @@ class Variable:
     name=""             # имя переменной
     value=[]            # значения переменной
     factors=[]          # факторы, в которые входит данная переменная
-    parents = []
-    childs = []
     card = 0            # мощность переменной
     PD = None           # безусловная вероятность данной переменной
 
@@ -47,17 +45,6 @@ class Variable:
 
     def __repr__(self):
         return self.name
-
-    def get_PD(self):                                       # calculates probability distribution w/ no conditions
-        if self.PD==None:                                   # find a factor contains this var as cons
-            f = None
-            for factor in self.factors:
-                if factor.cons == [self]:
-                    f = factor
-            for v in list(set(f.var) - set([self])):        # marginalize all other vars from this factor
-                f = f - v
-            self.PD = f.CPDs                                # and extract PD from this reduced factor's CPD
-        return self.PD
 
 class BinaryVariable(Variable):
     def __init__(self, name):
@@ -88,43 +75,43 @@ class Factor:
     CPDs=[]             # условные вероятности
     card=[]             # вектор разрядности переменных
     pcard=[]            # кумулятивная общая разрядность
+    cons=None
+    cond=[]
+    parents=[]
     name=''
-    def __init__(self, name='', var=[], CPDs=[]):
-        self.CPDs = CPDs    # TODO: validate CPD cardinality and sums
+    def __init__(self, name='', full='', values=[], cond=[], CPD=[], var=[]):
+        self.CPDs = CPD
         self.pcard=[]
         self.name=name
-        self.var=var
+        self.cond = []
+        self.parents = []
+        self.cons = None
+        if len(values)==0 and len(var)>0:
+            self.var = var
+        elif len(values)>0 and len(var)==0:
+            if full=="":
+                full=name
+            self.cons = Variable(full, values)
+            for factor in cond:
+                self.cond.append(factor.var[-1])
+                self.parents.append(factor)        
+            self.var=self.cond+[self.cons]
+        
         self.card=[]
         for i in self.var:
             self.card.append(i.card)
-##        for i in self.cons:
-##            i.factors.append(self)              # adds self to each variable' factor list
-##            self.card.append(i.card)            # builds factor's cardinality list from var's cardinalities
-##        for i in self.cond:                     # in case of conditioning
-##            self.card.append(i.card)            # continues factor'a cardinality list
-##            i.factors.append(self)              # adds self to variables' factor list
-##            for j in self.cons:                 # builds variables' hierarchy
-##                i.childs.append(j)
-##                j.parents.append(i)
         # counts cumulative cardinality
         for i in range(len(self.var)):            # actually forgot how it workes. However, tested
             self.pcard.append(
                 reduce(lambda x, y: x*y, self.card[i:], 1) )
         self.pcard.append(1)    # for compatibility
-
-    def __repr__(self):
-        res=self.name+':\n'
-        res+="\tScope:\n"
-        for i in self.var:
-            res+='\t\t'+i.name+'\n'
-        res+="\tCPDs:\n"
-        for j in range(len(self.CPDs)):
-            res+='\t\t'+str(j)+'->'
-            for i in self.index2ass(j):
-                res+=str(i)+", "
-            res+=str(self.CPDs[j])+'\n';
-        res+=str(self.sum())+'\n'
-        return res
+        if len(CPD)>0:
+            if len(CPD)!=self.pcard[0]:
+                raise AttributeError("Cannot build conditioned factor: CPD cardinality doesn't match")
+            tempf = self.marginal(self.var[-1])
+            for i in tempf.CPDs:
+                if i!=1.0:
+                    raise AttributeError("Cannot build conditioned factor: CPD doesn't sum to 1")
 
     def map(self, lst):
         '''
@@ -206,7 +193,7 @@ class Factor:
             return self
         res=Factor(name='Product',
                     var=list(set(self.var) | set(other.var)),
-                    CPDs=[])
+                    CPD=[])
         mapS = res.map(self.var)
         mapO = res.map(other.var)
         res.CPDs = []
@@ -248,7 +235,7 @@ class Factor:
 
         res = Factor('Marginal factor',
                         var = list(set(self.var) - set([var])),
-                        CPDs=[])
+                        CPD=[])
         mapX = self.map(res.var)
         for i in range(res.pcard[0]):
             res.CPDs.append(0)
@@ -285,7 +272,7 @@ class Factor:
 
         res = Factor(name='Reduced',
                         var = list(set(self.var) - set([var])),
-                        CPDs=[])
+                        CPD=[])
         mapX = self.map(res.var)
         mapY = self.map([var])
         for i in range(res.pcard[0]):
@@ -307,7 +294,7 @@ class Factor:
 
         res = Factor(name='Conditional',
                         var = self.var,
-                        CPDs=[])
+                        CPD=[])
         mapY = self.map([var])
         for i in range(res.pcard[0]):
             res.CPDs.append(0)
@@ -319,32 +306,38 @@ class Factor:
     def sum(self):
         return sum(self.CPDs)
 
-"""
-    def revert(self):
-
-        given factor A,B|C,D computes C,D|A,B
-
-        particular order of cons or cond may differ
-
-        res = self
-        for cond in self.cond:
-            res = res - cond
-            print '=>'
-            print cond
-            print cond.get_PD()
-            f_cond = Factor(name='',
-                            cons=[cond],
-                            cond=[],
-                            CPDs=cond.get_PD())
-            res = res*f_cond
-        for cons in self.cons:
-            f_cons = Factor(name='',
-                                cons=[cons],
-                                cond=[],
-                                CPDs=cons.get_PD())
-            res = res/f_cons
+    def __repr__(self):
+        res=self.name+':\n'
+        res+="\tScope:\n"
+        for i in self.var:
+            res+='\t\t'+i.name+'\n'
+        if self.cons!=None:
+            res+="\tVariable:\n"
+            
+            res+='\t\t'+self.cons.name+'\n'
+        res+="\tConditions:\n"
+        for i in self.cond:
+            res+='\t\t'+i.name+'\n'
+        res+="\tCPDs:\n"
+        for j in range(len(self.CPDs)):
+            res+='\t\t'+str(j)+'->'
+            for i in self.index2ass(j):
+                res+=str(i)+", "
+            res+=str(self.CPDs[j])+'\n';
+        res+=str(self.sum())+'\n'
         return res
-"""
+
+    def joint(self):
+        res = self;
+        for parent in self.parents:
+            res = res * parent.joint()
+        return res
+
+    def uncond(self):
+        res = self
+        for fact in self.parents:
+            res = res.marginal(fact.uncond().var[-1])
+        return res
 
 class PD(Factor):
     """
@@ -450,12 +443,12 @@ class Bayesian:
 ##F15.name='C|T'
 ##print F15
 
-C = PD(name='C', full="Cancer", values=["no", "yes"], CPD=[0.99, 0.01])
-T = CPD(name='T', full="Test", values=["pos", "neg"], cond=[C], CPD=[0.2, 0.8, 0.9, 0.1])
-print T
-print T.joint()
-print T.joint().uncond()
-print T.joint() / C
+C = Factor(name='C', full="Cancer", values=["no", "yes"], CPD=[0.99, 0.01])
+T = Factor(name='T', full="Test", values=["pos", "neg"], cond=[C], CPD=[0.2, 0.8, 0.9, 0.1])
+#~ print T
+#~ print T.joint()
+#~ print T.joint().uncond()
+#~ print T.joint() / 
 
 
 # student example
@@ -465,36 +458,36 @@ G = Variable("Grade", [1, 2, 3])
 S = BinaryVariable("SAT")
 L = BinaryVariable("Letter")
 
-F1 = Factor(name='D', var=[D], CPDs=[0.6, 0.4])
-F2 = Factor(name='I', var=[I], CPDs=[0.7, 0.3])
-F3 = Factor(name='G|I,D', var=[I, D, G], CPDs=[ 0.3,  0.4,  0.3,
+F1 = Factor(name='D', var=[D], CPD=[0.6, 0.4])
+F2 = Factor(name='I', var=[I], CPD=[0.7, 0.3])
+F3 = Factor(name='G|I,D', var=[I, D, G], CPD=[ 0.3,  0.4,  0.3,
                                                 0.05, 0.25, 0.7,
                                                 0.9,  0.08, 0.02,
                                                 0.5,  0.3,  0.2])
-F4 = Factor(name='S|I', var=[I,S], CPDs=[0.95, 0.05, 0.2, 0.8])
-F5 = Factor(name='L|G', var=[G,L], CPDs=[0.1, 0.9, 0.4, 0.6, 0.99, 0.01])
+F4 = Factor(name='S|I', var=[I,S], CPD=[0.95, 0.05, 0.2, 0.8])
+F5 = Factor(name='L|G', var=[G,L], CPD=[0.1, 0.9, 0.4, 0.6, 0.99, 0.01])
 
 #~ print F3
 #~ print F1*F2*F3*F4*F5
 
-D = PD(name='D', values=[0,1], CPD=[0.6, 0.4], full="Difficulty")
-I = PD(name='I', values=[0,1], CPD=[0.7, 0.3], full="Intelligence")
-G =CPD(name='G|I,D', values=[1, 2, 3], cond=[D,I], CPD=[0.3,  0.4,  0.3,
+D = Factor(name='D', values=[0,1], CPD=[0.6, 0.4], full="Difficulty")
+I = Factor(name='I', values=[0,1], CPD=[0.7, 0.3], full="Intelligence")
+G = Factor(name='G|I,D', values=[1, 2, 3], cond=[D,I], CPD=[0.3,  0.4,  0.3,
                                                         0.05, 0.25, 0.7,
                                                         0.9,  0.08, 0.02,
                                                         0.5,  0.3,  0.2],
                                                         full="Grade")
-S =CPD(name='S|I', values=[0, 1], cond=[I], CPD=[0.95, 0.05, 0.2, 0.8], full="SAT")
-L =CPD(name='L|G', values=[0, 1], cond=[G], CPD=[0.1, 0.9, 0.4, 0.6, 0.99, 0.01], full="Letter")
+S = Factor(name='S|I', values=[0, 1], cond=[I], CPD=[0.95, 0.05, 0.2, 0.8], full="SAT")
+L = Factor(name='L|G', values=[0, 1], cond=[G], CPD=[0.1, 0.9, 0.4, 0.6, 0.99, 0.01], full="Letter")
 #~ print (D*None)
 #~ print (D*I*S*G).marginal(var=D.var[-1])
-#~ print (D*I*S*G).reduce(var=L.var[-1], value=1).sum()
+#~ print (D*I*S*G*L).reduce(var=L.var[-1], value=1).sum()
 #~ print L.joint()
 
 
-#~ BN = Bayesian([D,I,S,G,L])
-#~ print S
-#~ print S.joint()
-#~ print S.joint()*I
-#~ print S.joint().marginal(var=S.var[0])
-#~ print S.joint().marginal(var=S.var[0])*I
+BN = Bayesian([D,I,S,G,L])
+print S
+print S.joint()
+print S.joint()*I
+print S.joint().marginal(var=S.var[0])
+print S.joint().marginal(var=S.var[0])*I
