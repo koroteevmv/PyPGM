@@ -202,6 +202,8 @@ class Factor:
                 F3.name = 'A,B,C'
                 print F3
         '''
+        if other==None:         # for compatibility
+            return self
         res=Factor(name='Product',
                     var=list(set(self.var) | set(other.var)),
                     CPDs=[])
@@ -242,7 +244,7 @@ class Factor:
                 print F4
         '''
         if not var in self.var:
-            raise AttributeError()
+            raise AttributeError("Unable to marginalize: variable is missing")
 
         res = Factor('Marginal factor',
                         var = list(set(self.var) - set([var])),
@@ -259,7 +261,7 @@ class Factor:
     def reduce(self, var=None, value=''):        
         '''
         computes a factor reduction
-        F(A,B)/F(B) = F(A|B)
+        F(A,B)/F(B) = F(A)
 
         Syntax:
 
@@ -294,6 +296,24 @@ class Factor:
             i1 = res.ass2index(assX)
             if assY[0]==value:
                 res.CPDs[i1] = self.CPDs[i]
+        return res
+
+    def __div__(self, other=None):        
+        '''
+        '''
+        var = other.var[-1]
+        if not var in self.var:
+            raise AttributeError()
+
+        res = Factor(name='Conditional',
+                        var = self.var,
+                        CPDs=[])
+        mapY = self.map([var])
+        for i in range(res.pcard[0]):
+            res.CPDs.append(0)
+        for i in range(len(self.CPDs)):
+            assY = self.ass(i, mapY)
+            res.CPDs[i] = self.CPDs[i]/other.CPDs[other.ass2index(assY)]
         return res
 
     def sum(self):
@@ -343,10 +363,16 @@ class PD(Factor):
         self.var = [Variable(full, values)]
         Factor.__init__(self, name=self.name, var=self.var, CPDs=self.CPDs)
 
+    def joint(self):
+        return self
+    def uncond(self):
+        return self
+
 class CPD(Factor):
     """ Class doc """
     cons=[]
     cond=[]
+    parents=[]
 
     def __init__(self, name='', full='', values=[], cond=[], CPD=[]):
         '''
@@ -355,8 +381,10 @@ class CPD(Factor):
             full=name
         self.cons = Variable(full, values)
         self.cond = []
+        self.parents = []
         for factor in cond:
             self.cond.append(factor.var[-1])
+            self.parents.append(factor)
         Factor.__init__(self, name=name, var=self.cond+[self.cons], CPDs=CPD)
         if len(CPD)!=self.pcard[0]:
             raise AttributeError("Cannot build conditioned factor: CPD cardinality doesn't match")
@@ -381,6 +409,34 @@ class CPD(Factor):
         res+=str(self.sum())+'\n'
         return res
 
+    def joint(self):
+        res = self;
+        for parent in self.parents:
+            res = res*parent.joint()
+        return res
+
+    def uncond(self):
+        res = self
+        for fact in self.parents:
+            res = res.marginal(fact.uncond().var[-1])
+        return res
+
+class Bayesian:
+    '''
+    '''
+    factors=[]
+    def __init__(self, factors):
+        self.factors = factors
+    def joint(self):
+        res=None
+        for fact in self.factors:
+            res = fact*res
+        return res
+    def query(self, query=[], evidence=[]):
+        q=set([])
+        e=set([])
+        h=set([])
+        pass
 
 # cancer example
 ##C = Variable('Cancer', ['yes', 'no'])
@@ -393,6 +449,13 @@ class CPD(Factor):
 ##F15 = F14/(F12 - C)
 ##F15.name='C|T'
 ##print F15
+
+C = PD(name='C', full="Cancer", values=["no", "yes"], CPD=[0.99, 0.01])
+T = CPD(name='T', full="Test", values=["pos", "neg"], cond=[C], CPD=[0.2, 0.8, 0.9, 0.1])
+print T
+print T.joint()
+print T.joint().uncond()
+print T.joint() / C
 
 
 # student example
@@ -416,11 +479,22 @@ F5 = Factor(name='L|G', var=[G,L], CPDs=[0.1, 0.9, 0.4, 0.6, 0.99, 0.01])
 
 D = PD(name='D', values=[0,1], CPD=[0.6, 0.4], full="Difficulty")
 I = PD(name='I', values=[0,1], CPD=[0.7, 0.3], full="Intelligence")
-S =CPD(name='S|I', values=[0, 1], cond=[I], CPD=[0.95, 0.05, 0.2, 0.8], full="SAT")
 G =CPD(name='G|I,D', values=[1, 2, 3], cond=[D,I], CPD=[0.3,  0.4,  0.3,
                                                         0.05, 0.25, 0.7,
                                                         0.9,  0.08, 0.02,
                                                         0.5,  0.3,  0.2],
                                                         full="Grade")
+S =CPD(name='S|I', values=[0, 1], cond=[I], CPD=[0.95, 0.05, 0.2, 0.8], full="SAT")
 L =CPD(name='L|G', values=[0, 1], cond=[G], CPD=[0.1, 0.9, 0.4, 0.6, 0.99, 0.01], full="Letter")
-print D*I*S*G*L
+#~ print (D*None)
+#~ print (D*I*S*G).marginal(var=D.var[-1])
+#~ print (D*I*S*G).reduce(var=L.var[-1], value=1).sum()
+#~ print L.joint()
+
+
+#~ BN = Bayesian([D,I,S,G,L])
+#~ print S
+#~ print S.joint()
+#~ print S.joint()*I
+#~ print S.joint().marginal(var=S.var[0])
+#~ print S.joint().marginal(var=S.var[0])*I
