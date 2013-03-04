@@ -19,14 +19,10 @@ class Variable:
     '''
     name=""             # имя переменной
     value=[]            # значения переменной
-    factors=[]          # факторы, в которые входит данная переменная
     card = 0            # мощность переменной
-    PD = None           # безусловная вероятность данной переменной
 
     def __init__(self, name, a):
         self.name = name
-        self.factors=[]
-        self.parents=[]
         self.childs=[]
         if  (type(a)==int):             # cardinality passed
             self.card = a
@@ -35,7 +31,6 @@ class Variable:
         elif(type(a)==list):            # values list passed
             self.value = a
             self.card = len(a)
-        self.PD=None
 
     def find_value(self, val):
         '''
@@ -44,6 +39,8 @@ class Variable:
         for j in range(len(self.value)):
             if self.value[j]==val:
                 return j
+    def __abs__(self):
+        return self.card
 
     def __repr__(self):
         return self.name
@@ -53,10 +50,6 @@ class BinaryVariable(Variable):
         self.name = name
         self.value=[0, 1]
         self.card = 2
-        self.factors = []
-        self.parents=[]
-        self.childs=[]
-        self.PD = None
 
 class Factor:
     '''
@@ -77,10 +70,10 @@ class Factor:
     CPDs=[]             # условные вероятности
     card=[]             # вектор разрядности переменных
     pcard=[]            # кумулятивная общая разрядность
-    cons=None
-    cond=[]
-    parents=[]
-    name=''
+    cons=None           # переменная-следствие (не в случае общей вероятности)
+    cond=[]             # переменные-условия
+    parents=[]          # факторы-родители
+    name=''             # имя фактора
     def __init__(self, name='', full='', values=[], cond=[], CPD=[], var=[]):
         self.CPDs = CPD
         self.pcard=[]
@@ -94,11 +87,11 @@ class Factor:
         if len(values)>0:
             if full=="":
                 full=name
-            self.cons = Variable(full, values)    
+            self.cons = Variable(full, values)
             self.var=self.cond+var+[self.cons]
-        else:                
+        else:
             self.var=self.cond+var
-        
+
         self.card=[]
         for i in self.var:
             self.card.append(i.card)
@@ -248,7 +241,7 @@ class Factor:
             res.CPDs[i1] += self.CPDs[i]
         return res
 
-    def reduce(self, var=None, value=''):        
+    def reduce(self, var=None, value=''):
         '''
         computes a factor reduction
         F(A,B)/F(B) = F(A)
@@ -288,7 +281,7 @@ class Factor:
                 res.CPDs[i1] = self.CPDs[i]
         return res
 
-    def __div__(self, other=None):        
+    def __div__(self, other=None):
         '''
         '''
         var = other.var[-1]
@@ -306,6 +299,9 @@ class Factor:
             assY = self.ass(i, mapY)
             res.CPDs[i] = self.CPDs[i]/other.CPDs[other.ass2index(assY)]
         return res
+
+    def __abs__(self):
+        return self.pcard[0]
 
     def sum(self):
         return sum(self.CPDs)
@@ -341,7 +337,7 @@ class Factor:
         for fact in self.parents:
             res = res.marginal(fact.uncond().var[-1])
         return res
-        
+
     def query(self, query=[], evidence=[]):
         res = self.joint()
         q = []
@@ -384,7 +380,7 @@ class Bayesian:
             res = res / e.uncond()
         return res
 
-        
+
 # cancer example
 ##C = Variable('Cancer', ['yes', 'no'])
 ##T = Variable('Test', ['pos', 'neg'])
@@ -399,10 +395,11 @@ class Bayesian:
 
 C = Factor(name='C', full="Cancer", values=["no", "yes"], CPD=[0.99, 0.01])
 T = Factor(name='T', full="Test", values=["pos", "neg"], cond=[C], CPD=[0.2, 0.8, 0.9, 0.1])
-#~ print T
-#~ print T.joint()
-#~ print T.uncond()
-#~ print T.joint() / T.uncond()
+print T
+print T.joint()
+print T.uncond()
+print T.query(query=[C], evidence=[T])
+print T.joint() / T.uncond()
 
 
 # student example
@@ -432,7 +429,8 @@ S = Factor(name='S|I', values=[0, 1], cond=[I], CPD=[0.95, 0.05, 0.2, 0.8], full
 L = Factor(name='L|G', values=[0, 1], cond=[G], CPD=[0.1, 0.9, 0.4, 0.6, 0.99, 0.01], full="Letter")
 
 BN = Bayesian([D,I,S,G,L])
-print G.query(query=[G], evidence=[D])
+
+##print G.query(query=[G], evidence=[D])
 # TODO: test on larger nets with operands of marginal, reduce, __mul__, __div__ including more than one cons var
 # TODO: doctest everything
 # TODO: furthermore: local inference
