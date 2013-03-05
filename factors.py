@@ -345,13 +345,34 @@ class Factor:
             q.append(qu.var[-1])
         e = []
         for qu in evidence:
-            q.append(qu.var[-1])
+            e.append(qu.var[-1])
         hidden=set(res.var) - set(q) - set(e)
         for h in hidden:
             res = res.marginal(h)
         for e in evidence:
             res = res / e.uncond()
         return res
+
+    def query2(self, query=[], evidence={}):
+        res = self.joint()
+        q = []
+        for qu in query:
+            q.append(qu.var[-1])
+        e = {}
+        for ev in evidence.keys():
+            e[ev.var[-1]] = evidence[ev]
+        hidden=set(res.var) - set(q) - set(e)
+        for h in hidden:
+            res = res.marginal(h)
+        for ev in e.keys():
+            res = res.reduce(var=ev, value=e[ev]).norm()
+        return res
+
+    def norm(self):
+        s = self.sum()
+        for i in range(len(self.CPDs)):
+            self.CPDs[i] = self.CPDs[i] / s
+        return self
 
 class Bayesian:
     # TODO: maybe delete this class
@@ -395,11 +416,11 @@ class Bayesian:
 
 C = Factor(name='C', full="Cancer", values=["no", "yes"], CPD=[0.99, 0.01])
 T = Factor(name='T', full="Test", values=["pos", "neg"], cond=[C], CPD=[0.2, 0.8, 0.9, 0.1])
-print T
-print T.joint()
-print T.uncond()
-print T.query(query=[C], evidence=[T])
-print T.joint() / T.uncond()
+##print T
+##print T.joint()
+##print T.uncond()
+##print T.query(query=[C], evidence=[T])
+##print T.joint() / T.uncond()
 
 
 # student example
