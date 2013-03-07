@@ -8,6 +8,10 @@
 # Licence:     GNU GPL
 #--------------------------------------------
 
+import networkx as nx
+import matplotlib.pyplot as plt
+import pygraphviz as pgv
+
 class Variable:
     '''
     Syntax:
@@ -263,6 +267,9 @@ class Factor:
                 F4.name = 'A,B'
                 print F4
         '''
+        return self._reduce2(var, value).norm()
+
+    def _reduce1(self, var=None, value=''):
         if not var in self.var:
             raise AttributeError()
 
@@ -280,6 +287,24 @@ class Factor:
             if assY[0]==value:
                 res.CPDs[i1] = self.CPDs[i]
         return res
+
+    def _reduce2(self, var=None, value=''):
+        if not var in self.var:
+            raise AttributeError()
+
+        res = Factor(name='Reduced',
+                        var = list(set(self.var) - set([var])),
+                        CPD=[])
+        mapX = self.map(res.var)
+        mapY = self.map([var])
+        for i in range(res.pcard[0]):
+            res.CPDs.append(0)
+        for i in range(len(self.CPDs)):
+            assX = self.ass(i, mapX)
+            assY = self.ass(i, mapY)
+            i1 = res.ass2index(assX)
+            res.CPDs[i1] = self.CPDs[i] * float(assY[0]==value)
+        return res.marginal(var)
 
     def __div__(self, other=None):
         '''
@@ -305,6 +330,9 @@ class Factor:
 
     def sum(self):
         return sum(self.CPDs)
+
+    def __str__(self):
+        return self.name
 
     def __repr__(self):
         res=self.name+':\n'
@@ -374,18 +402,25 @@ class Factor:
             self.CPDs[i] = self.CPDs[i] / s
         return self
 
-class Bayesian:
+class Bayesian():
     # TODO: maybe delete this class
     '''
     '''
     factors=[]
     def __init__(self, factors):
+        self.graph = nx.DiGraph()
         self.factors = factors
+        for f in self.factors:
+            self.graph.add_node(f)
+            for p in f.parents:
+                self.graph.add_edge(p, f)
+                
     def joint(self):
         res = None
         for fact in self.factors:
             res = fact*res
         return res
+        
     def query(self, query=[], evidence=[]):
         res = self.joint()
         q = []
@@ -450,6 +485,13 @@ S = Factor(name='S|I', values=[0, 1], cond=[I], CPD=[0.95, 0.05, 0.2, 0.8], full
 L = Factor(name='L|G', values=[0, 1], cond=[G], CPD=[0.1, 0.9, 0.4, 0.6, 0.99, 0.01], full="Letter")
 
 BN = Bayesian([D,I,S,G,L])
+#~ print G
+#~ print G.parents
+print G
+print str(G)
+print `G`
+nx.draw_graphviz(BN.graph, prog='dot')
+plt.show()
 
 ##print G.query(query=[G], evidence=[D])
 # TODO: test on larger nets with operands of marginal, reduce, __mul__, __div__ including more than one cons var
