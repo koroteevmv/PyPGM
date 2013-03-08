@@ -326,9 +326,15 @@ class Factor:
         return res
 
     def __abs__(self):
+        '''
+        returns factor's cardianlity: product of all variables' cardinalities
+        '''
         return self.pcard[0]
 
     def sum(self):
+        '''
+        returns sum of all factor's values
+        '''
         return sum(self.CPDs)
 
     def __str__(self):
@@ -355,12 +361,19 @@ class Factor:
         return res
 
     def joint(self):
+        '''
+        computes joint distribution out of the factor IF it has any conditions
+        i. e. computes P(A,B,C) out of P(A,B|C)
+        '''
         res = self;
         for parent in self.parents:
             res = res * parent.joint()
         return res
 
     def uncond(self):
+        '''
+        computes P(A,B) out of P(A,B|C,D)
+        '''
         res = self.joint()
         for fact in self.parents:
             res = res.marginal(fact.uncond().var[-1])
@@ -382,6 +395,7 @@ class Factor:
         return res
 
     def query2(self, query=[], evidence={}):
+        # TODO: furthermore: local inference
         res = self.joint()
         q = []
         for qu in query:
@@ -397,15 +411,16 @@ class Factor:
         return res
 
     def norm(self):
+        '''
+        normalizes values of the factorto make all valies sum to 1.0
+        mutates the factor!
+        '''
         s = self.sum()
         for i in range(len(self.CPDs)):
             self.CPDs[i] = self.CPDs[i] / s
         return self
 
 class Bayesian():
-    # TODO: maybe delete this class
-    '''
-    '''
     factors=[]
     def __init__(self, factors):
         self.graph = nx.DiGraph()
@@ -427,4 +442,3 @@ class Bayesian():
 
 # TODO: test on larger nets with operands of marginal, reduce, __mul__, __div__ including more than one cons var
 # TODO: doctest everything
-# TODO: furthermore: local inference
