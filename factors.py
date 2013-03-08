@@ -411,89 +411,20 @@ class Bayesian():
         self.graph = nx.DiGraph()
         self.factors = factors
         for f in self.factors:
-            self.graph.add_node(f)
+            self.graph.add_node(f.var[-1])
             for p in f.parents:
-                self.graph.add_edge(p, f)
+                self.graph.add_edge(p.var[-1], f.var[-1])
                 
     def joint(self):
         res = None
         for fact in self.factors:
             res = fact*res
         return res
-        
-    def query(self, query=[], evidence=[]):
-        res = self.joint()
-        q = []
-        for qu in query:
-            q.append(qu.var[-1])
-        e = []
-        for qu in evidence:
-            q.append(qu.var[-1])
-        hidden=set(res.var) - set(q) - set(e)
-        for h in hidden:
-            res = res.marginal(h)
-        for e in evidence:
-            res = res / e.uncond()
-        return res
 
+    def draw(self):
+        pos = nx.pygraphviz_layout(self.graph, prog='dot')
+        nx.draw(self.graph, pos, node_shape='D')
 
-# cancer example
-##C = Variable('Cancer', ['yes', 'no'])
-##T = Variable('Test', ['pos', 'neg'])
-##
-##F11 = Factor(name='C', cons=[C], CPDs=[0.0001, 0.9999])
-##F12 = Factor(name='T|C', cons=[T], cond=[C], CPDs=[0.9, 0.1, 0.2, 0.8])
-##F14 = (F12 - C) * F11
-##F14.name='C,T'
-##F15 = F14/(F12 - C)
-##F15.name='C|T'
-##print F15
-
-C = Factor(name='C', full="Cancer", values=["no", "yes"], CPD=[0.99, 0.01])
-T = Factor(name='T', full="Test", values=["pos", "neg"], cond=[C], CPD=[0.2, 0.8, 0.9, 0.1])
-##print T
-##print T.joint()
-##print T.uncond()
-##print T.query(query=[C], evidence=[T])
-##print T.joint() / T.uncond()
-
-
-# student example
-D = BinaryVariable("Difficulty")
-I = BinaryVariable("Intelligence")
-G = Variable("Grade", [1, 2, 3])
-S = BinaryVariable("SAT")
-L = BinaryVariable("Letter")
-
-F1 = Factor(name='D', var=[D], CPD=[0.6, 0.4])
-F2 = Factor(name='I', var=[I], CPD=[0.7, 0.3])
-F3 = Factor(name='G|I,D', var=[I, D, G], CPD=[ 0.3,  0.4,  0.3,
-                                                0.05, 0.25, 0.7,
-                                                0.9,  0.08, 0.02,
-                                                0.5,  0.3,  0.2])
-F4 = Factor(name='S|I', var=[I,S], CPD=[0.95, 0.05, 0.2, 0.8])
-F5 = Factor(name='L|G', var=[G,L], CPD=[0.1, 0.9, 0.4, 0.6, 0.99, 0.01])
-
-D = Factor(name='D', values=[0,1], CPD=[0.6, 0.4], full="Difficulty")
-I = Factor(name='I', values=[0,1], CPD=[0.7, 0.3], full="Intelligence")
-G = Factor(name='G|I,D', values=[1, 2, 3], cond=[D,I], CPD=[0.3,  0.4,  0.3,
-                                                        0.05, 0.25, 0.7,
-                                                        0.9,  0.08, 0.02,
-                                                        0.5,  0.3,  0.2],
-                                                        full="Grade")
-S = Factor(name='S|I', values=[0, 1], cond=[I], CPD=[0.95, 0.05, 0.2, 0.8], full="SAT")
-L = Factor(name='L|G', values=[0, 1], cond=[G], CPD=[0.1, 0.9, 0.4, 0.6, 0.99, 0.01], full="Letter")
-
-BN = Bayesian([D,I,S,G,L])
-#~ print G
-#~ print G.parents
-print G
-print str(G)
-print `G`
-nx.draw_graphviz(BN.graph, prog='dot')
-plt.show()
-
-##print G.query(query=[G], evidence=[D])
 # TODO: test on larger nets with operands of marginal, reduce, __mul__, __div__ including more than one cons var
 # TODO: doctest everything
 # TODO: furthermore: local inference

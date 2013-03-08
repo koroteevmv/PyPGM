@@ -12,27 +12,58 @@
 
 import factors
 
-class Factor(factors.Factor):
-    def reduce(self, var=None, value=''):
-        print "AAAAAAAA"
-        if not var in self.var:
-            raise AttributeError()
+def cancer_example():
+    ##C = Variable('Cancer', ['yes', 'no'])
+    ##T = Variable('Test', ['pos', 'neg'])
+    ##
+    ##F11 = Factor(name='C', cons=[C], CPDs=[0.0001, 0.9999])
+    ##F12 = Factor(name='T|C', cons=[T], cond=[C], CPDs=[0.9, 0.1, 0.2, 0.8])
+    ##F14 = (F12 - C) * F11
+    ##F14.name='C,T'
+    ##F15 = F14/(F12 - C)
+    ##F15.name='C|T'
+    ##print F15
 
-        res = self.__class__(name='Reduced',
-                        var = list(set(self.var) - set([var])),
-                        CPD=[])
-        mapX = self.map(res.var)
-        mapY = self.map([var])
-        for i in range(res.pcard[0]):
-            res.CPDs.append(0)
-        for i in range(len(self.CPDs)):
-            assX = self.ass(i, mapX)
-            assY = self.ass(i, mapY)
-            i1 = res.ass2index(assX)
-            if assY[0]==value:
-                res.CPDs[i1] = self.CPDs[i]
-        return res
-        pass
+    C = Factor(name='C', full="Cancer", values=["no", "yes"], CPD=[0.99, 0.01])
+    T = Factor(name='T', full="Test", values=["pos", "neg"], cond=[C], CPD=[0.2, 0.8, 0.9, 0.1])
+    print T
+    print T.joint()
+    print T.uncond()
+    print T.query(query=[C], evidence=[T])
+    print T.joint() / T.uncond()
+
+def student_example():
+    D = BinaryVariable("Difficulty")
+    I = BinaryVariable("Intelligence")
+    G = Variable("Grade", [1, 2, 3])
+    S = BinaryVariable("SAT")
+    L = BinaryVariable("Letter")
+
+    F1 = Factor(name='D', var=[D], CPD=[0.6, 0.4])
+    F2 = Factor(name='I', var=[I], CPD=[0.7, 0.3])
+    F3 = Factor(name='G|I,D', var=[I, D, G], CPD=[ 0.3,  0.4,  0.3,
+                                                    0.05, 0.25, 0.7,
+                                                    0.9,  0.08, 0.02,
+                                                    0.5,  0.3,  0.2])
+    F4 = Factor(name='S|I', var=[I,S], CPD=[0.95, 0.05, 0.2, 0.8])
+    F5 = Factor(name='L|G', var=[G,L], CPD=[0.1, 0.9, 0.4, 0.6, 0.99, 0.01])
+
+    D = Factor(name='D', values=[0,1], CPD=[0.6, 0.4], full="Difficulty")
+    I = Factor(name='I', values=[0,1], CPD=[0.7, 0.3], full="Intelligence")
+    G = Factor(name='G|I,D', values=[1, 2, 3], cond=[D,I], CPD=[0.3,  0.4,  0.3,
+                                                            0.05, 0.25, 0.7,
+                                                            0.9,  0.08, 0.02,
+                                                            0.5,  0.3,  0.2],
+                                                            full="Grade")
+    S = Factor(name='S|I', values=[0, 1], cond=[I], CPD=[0.95, 0.05, 0.2, 0.8], full="SAT")
+    L = Factor(name='L|G', values=[0, 1], cond=[G], CPD=[0.1, 0.9, 0.4, 0.6, 0.99, 0.01], full="Letter")
+
+    BN = Bayesian([D,I,S,G,L])
+    #~ print G
+    #~ print G.parents
+    print G
+    print str(G)
+    print `G`
 
 def bayesian_inference():
     A = Factor(name='A',
