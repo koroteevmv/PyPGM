@@ -12,6 +12,10 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import pygraphviz as pgv
 
+'''
+
+'''
+
 class Variable:
     '''
     Random variable is the basic building block fo Bayesian and Markov nets.
@@ -20,9 +24,19 @@ class Variable:
     
     Syntax:
             >>> E = Variable("Eartquake", ['still', 'shake']);
-            >>> B = Variable("Burglary",  ['safe', 'robbed']);
-            >>> A = Variable("Alarm", ['quiet', 'loud']);
-            >>> R = Variable("Radio", ['off', 'on'])
+            >>> B = Variable("Burglary",  [0, 1]);
+            >>> A = Variable("Alarm", 3);
+            >>> R = Variable("Radio", 2)
+
+    Fields:
+        name
+            string representing the name of the variable. Assuming
+            this is readble full name. This name is used for representing.
+        value
+            list of all possible values. Elements can be any type with defined
+            equality operation
+        card
+            cardinality of the variable - number of all possible values
 
     '''
     name=""             # имя переменной
@@ -66,7 +80,8 @@ class Variable:
 
     def find_value(self, val):
         '''
-        Given value finds its number among variable's values
+        Given value finds its number among variable's values.
+        If val is not in list of values, returns None
         
         Syntax:
             >>> E = Variable("Eartquake", ['still', 'shake'])
@@ -80,10 +95,14 @@ class Variable:
             >>> E.find_value(2)
             2
 
+        Arguments:
+            val
+                
         '''
         for j in range(len(self.value)):
             if self.value[j]==val:
                 return j
+                
     def __abs__(self):
         '''
         Returns cardinality of the variable
@@ -119,25 +138,20 @@ class BinaryVariable(Variable):
     def __init__(self, name):
         '''
         Syntax:
-            >>> E = Variable("Eartquake", ['still', 'shake'])
+            >>> E = BinaryVariable('coin flip')
             >>> E
-            Eartquake
+            coin flip
             >>> abs(E)
             2
-            >>> E.find_value('still')
-            0
-            >>> E.find_value('shake')
-            1
-            >>> E = Variable("Eartquake", 3)
-            >>> abs(E)
-            3
-            >>> E
-            Eartquake
+            >>> E.value
+            [0, 1]
             >>> E.find_value(1)
             1
-            >>> E.find_value(2)
-            2
 
+        Arguments:
+            name
+                string representing the name of the variable. Assuming
+                this is readble full name. This name is used for representing.
         '''
         self.name = name
         self.value=[0, 1]
@@ -145,6 +159,8 @@ class BinaryVariable(Variable):
 
 class Factor:
     '''
+    Represents a factor - 
+    
     Syntax:
 
             E = Variable("Eartquake", ['still', 'shake']);
@@ -157,6 +173,24 @@ class Factor:
             F3 = Factor(name='R|E', var=[R,E],   CPDs=[0.9, 0.2, 0.1, 0.8]);
             F4 = Factor(name='A|E,B', var=[A,E,B],
                         CPDs=[1.0, 0.0, 0.01, 0.99, 0.02, 0.98, 0.0, 1.0]);
+
+    Fields:
+        name
+            
+        var
+            
+        CPDs
+            
+        card
+            
+        pcard
+            
+        cons
+            
+        cond
+            
+        parents
+            
     '''
     var=[]              # переменные, входящие в фактор
     CPDs=[]             # условные вероятности
@@ -167,6 +201,14 @@ class Factor:
     parents=[]          # факторы-родители
     name=''             # имя фактора
     def __init__(self, name='', full='', values=[], cond=[], CPD=[], var=[]):
+        '''
+        
+        Syntax:
+            
+
+        Arguments:
+            
+        '''
         self.CPDs = CPD
         self.pcard=[]
         self.name=name
@@ -195,17 +237,18 @@ class Factor:
         if len(CPD)>0:
             if len(CPD)!=self.pcard[0]:
                 raise AttributeError("Cannot build conditioned factor: CPD cardinality doesn't match")
-            tempf = self.marginal(self.var[-1])
-            # TODO: maybe delete this check (for unnormalized factors)
-            for i in tempf.CPDs:
-                if i!=1.0:
-                    raise AttributeError("Cannot build conditioned factor: CPD doesn't sum to 1")
 
     def map(self, lst):
         '''
         bulds a map: hash table,
         where keys - indecies of THIS factor's assingment list
         and values - indecies of given var list assignment, corresponding to key
+        
+        Syntax:
+            
+
+        Arguments:
+            
         '''
         m={}
         for i in range(len(self.var)):
@@ -219,6 +262,12 @@ class Factor:
         given number of assignment, computes
         this assignment of this factor
         and returns it rearranged according to map given
+        
+        Syntax:
+            
+
+        Arguments:
+            
         '''
         ass = self.index2ass(n)
         res = []
@@ -236,6 +285,12 @@ class Factor:
         computes a number of thiaa asignment
 
         this number is always in range [0..factor.pcard[0]-1]
+        
+        Syntax:
+            
+
+        Arguments:
+            
         '''
         j=0
         res=0
@@ -251,6 +306,12 @@ class Factor:
 
         if given index is greater than factor.pcard[0]-1
         it is equal to (index mod factor.pcard[0])
+        
+        Syntax:
+            
+
+        Arguments:
+            
         '''
         res=[]
         for j in range(len(self.var)):
@@ -276,6 +337,12 @@ class Factor:
                 F3 = F1*F2
                 F3.name = 'A,B,C'
                 print F3
+        
+        Syntax:
+            
+
+        Arguments:
+            
         '''
         if other==None:         # for compatibility
             return self
@@ -317,6 +384,12 @@ class Factor:
                 F4 = F3.marginal(B)
                 F4.name = 'A,C'
                 print F4
+        
+        Syntax:
+            
+
+        Arguments:
+            
         '''
         if not var in self.var:
             raise AttributeError("Unable to marginalize: variable is missing")
@@ -354,6 +427,12 @@ class Factor:
                 F4 = F3.reduce(var=C, value=1)
                 F4.name = 'A,B'
                 print F4
+        
+        Syntax:
+            
+
+        Arguments:
+            
         '''
         return self._reduce2(var, value).norm()
 
@@ -396,6 +475,13 @@ class Factor:
 
     def __div__(self, other=None):
         '''
+        
+        
+        Syntax:
+            
+
+        Arguments:
+            
         '''
         var = other.var[-1]
         if not var in self.var:
@@ -416,19 +502,49 @@ class Factor:
     def __abs__(self):
         '''
         returns factor's cardianlity: product of all variables' cardinalities
+        
+        Syntax:
+            
+
+        Arguments:
+            
         '''
         return self.pcard[0]
 
     def sum(self):
         '''
         returns sum of all factor's values
+        
+        Syntax:
+            
+
+        Arguments:
+            
         '''
         return sum(self.CPDs)
 
     def __str__(self):
+        '''
+        
+        
+        Syntax:
+            
+
+        Arguments:
+            
+        '''
         return self.name
 
     def __repr__(self):
+        '''
+        
+        
+        Syntax:
+            
+
+        Arguments:
+            
+        '''
         res=self.name+':\n'
         res+="\tScope:\n"
         for i in self.var:
@@ -452,6 +568,12 @@ class Factor:
         '''
         computes joint distribution out of the factor IF it has any conditions
         i. e. computes P(A,B,C) out of P(A,B|C)
+        
+        Syntax:
+            
+
+        Arguments:
+            
         '''
         res = self;
         for parent in self.parents:
@@ -461,6 +583,12 @@ class Factor:
     def uncond(self):
         '''
         computes P(A,B) out of P(A,B|C,D)
+        
+        Syntax:
+            
+
+        Arguments:
+            
         '''
         res = self.joint()
         for fact in self.parents:
@@ -468,6 +596,15 @@ class Factor:
         return res
 
     def query(self, query=[], evidence=[]):
+        '''
+        
+        
+        Syntax:
+            
+
+        Arguments:
+            
+        '''
         res = self.joint()
         q = []
         for qu in query:
@@ -483,6 +620,15 @@ class Factor:
         return res
 
     def query2(self, query=[], evidence={}):
+        '''
+        
+        
+        Syntax:
+            
+
+        Arguments:
+            
+        '''
         # TODO: furthermore: local inference
         res = self.joint()
         q = []
@@ -501,7 +647,13 @@ class Factor:
     def norm(self):
         '''
         normalizes values of the factorto make all valies sum to 1.0
-        mutates the factor!
+        Warning: mutates the factor!
+        
+        Syntax:
+            
+
+        Arguments:
+            
         '''
         s = self.sum()
         for i in range(len(self.CPDs)):
@@ -509,8 +661,27 @@ class Factor:
         return self
 
 class Bayesian():
+    '''
+    
+        
+    Syntax:
+        
+
+    Fields:
+        
+    '''
     factors=[]
+    
     def __init__(self, factors):
+        '''
+        
+        
+        Syntax:
+            
+
+        Arguments:
+            
+        '''
         self.graph = nx.DiGraph()
         self.factors = factors
         for f in self.factors:
@@ -519,12 +690,30 @@ class Bayesian():
                 self.graph.add_edge(p.var[-1], f.var[-1])
 
     def joint(self):
+        '''
+        
+        
+        Syntax:
+            
+
+        Arguments:
+            
+        '''
         res = None
         for fact in self.factors:
             res = fact*res
         return res
 
     def draw(self):
+        '''
+        
+        
+        Syntax:
+            
+
+        Arguments:
+            
+        '''
         pos = nx.pygraphviz_layout(self.graph, prog='dot')
         nx.draw(self.graph, pos, node_shape='D')
 
