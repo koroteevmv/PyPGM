@@ -14,20 +14,48 @@ import pygraphviz as pgv
 
 class Variable:
     '''
+    Random variable is the basic building block fo Bayesian and Markov nets.
+    Variable can be assigned to one of given set of values. This class
+    represents discrete variable.
+    
     Syntax:
+            >>> E = Variable("Eartquake", ['still', 'shake']);
+            >>> B = Variable("Burglary",  ['safe', 'robbed']);
+            >>> A = Variable("Alarm", ['quiet', 'loud']);
+            >>> R = Variable("Radio", ['off', 'on'])
 
-            E = Variable("Eartquake", ['still', 'shake']);
-            B = Variable("Burglary",  ['safe', 'robbed']);
-            A = Variable("Alarm", ['quiet', 'loud']);
-            R = Variable("Radio", ['off', 'on'])
     '''
     name=""             # имя переменной
     value=[]            # значения переменной
     card = 0            # мощность переменной
 
     def __init__(self, name, a):
+        '''
+        Syntax:
+            >>> E = Variable("Eartquake", ['still', 'shake'])
+            >>> print E.name
+            Eartquake
+            >>> E.card
+            2
+            >>> E.value
+            ['still', 'shake']
+            >>> E = Variable("Eartquake", 3)
+            >>> E.value
+            [0, 1, 2]
+            >>> E.card
+            3
+
+        Arguments:
+            name
+                string representing the name of the variable. Assuming
+                this is readble full name. This name is used for representing.
+            a
+                if list, represent full set of possible variable's values
+                if int,  represent number of value (cardinality). Values in this
+                case are integers from 0 to a-1.
+        '''
         self.name = name
-        self.childs=[]
+        self.value = []
         if  (type(a)==int):             # cardinality passed
             self.card = a
             for i in range(a):
@@ -38,19 +66,79 @@ class Variable:
 
     def find_value(self, val):
         '''
-        given value finds its number among variable's values
+        Given value finds its number among variable's values
+        
+        Syntax:
+            >>> E = Variable("Eartquake", ['still', 'shake'])
+            >>> E.find_value('still')
+            0
+            >>> E.find_value('shake')
+            1
+            >>> E = Variable("Eartquake", 3)
+            >>> E.find_value(1)
+            1
+            >>> E.find_value(2)
+            2
+
         '''
         for j in range(len(self.value)):
             if self.value[j]==val:
                 return j
     def __abs__(self):
+        '''
+        Returns cardinality of the variable
+
+        Syntax:
+            >>> E = Variable("Eartquake", ['still', 'shake'])
+            >>> abs(E)
+            2
+            >>> E = Variable("Eartquake", 3)
+            >>> abs(E)
+            3
+        '''
         return self.card
 
     def __repr__(self):
+        '''
+        Represent variable as a string (only name)
+
+        Syntax:
+            >>> E = Variable("Eartquake", ['still', 'shake'])
+            >>> E
+            Eartquake
+            >>> E = Variable("Eartquake", 3)
+            >>> E
+            Eartquake
+        '''
         return self.name
 
 class BinaryVariable(Variable):
+    '''
+    Particular case of the variable with only two possible values: 0 and 1
+    '''
     def __init__(self, name):
+        '''
+        Syntax:
+            >>> E = Variable("Eartquake", ['still', 'shake'])
+            >>> E
+            Eartquake
+            >>> abs(E)
+            2
+            >>> E.find_value('still')
+            0
+            >>> E.find_value('shake')
+            1
+            >>> E = Variable("Eartquake", 3)
+            >>> abs(E)
+            3
+            >>> E
+            Eartquake
+            >>> E.find_value(1)
+            1
+            >>> E.find_value(2)
+            2
+
+        '''
         self.name = name
         self.value=[0, 1]
         self.card = 2
@@ -429,7 +517,7 @@ class Bayesian():
             self.graph.add_node(f.var[-1])
             for p in f.parents:
                 self.graph.add_edge(p.var[-1], f.var[-1])
-                
+
     def joint(self):
         res = None
         for fact in self.factors:
@@ -442,3 +530,8 @@ class Bayesian():
 
 # TODO: test on larger nets with operands of marginal, reduce, __mul__, __div__ including more than one cons var
 # TODO: doctest everything
+
+if __name__ == "__main__":
+    import doctest
+#    doctest.testmod(verbose=False)
+    doctest.testmod(verbose=True)
