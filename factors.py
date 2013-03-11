@@ -1,4 +1,4 @@
-# -*- coding: UTF-8 -*-
+﻿# -*- coding: UTF-8 -*-
 #!/usr/bin/env python
 #--------------------------------------------
 # Name:        PyPGM
@@ -10,9 +10,37 @@
 
 import networkx as nx
 import matplotlib.pyplot as plt
-import pygraphviz as pgv
+try:
+    import pygraphviz as pgv
+except:
+    pass
 
 '''
+Syntax:
+    >>> D = Factor(name='D', values=[0,1], CPD=[0.6, 0.4], full="Difficulty")
+    >>> I = Factor(name='I', values=[0,1], CPD=[0.7, 0.3], full="Intelligence")
+    >>> G = Factor(name='G|I,D', values=[1, 2, 3], cond=[D,I], CPD=[0.3,  0.4,  0.3,
+    ... 0.05, 0.25, 0.7,
+    ... 0.9,  0.08, 0.02,
+    ... 0.5,  0.3,  0.2],
+    ... full="Grade")
+    >>> S = Factor(name='S|I', values=[0, 1], cond=[I], CPD=[0.95, 0.05, 0.2, 0.8], full="SAT")
+    >>> L = Factor(name='L|G', values=[0, 1], cond=[G], CPD=[0.1, 0.9, 0.4, 0.6, 0.99, 0.01], full="Letter")
+    >>> BN = Bayesian([D,I,S,G,L])
+    >>> R = BN.joint().query2(query=[I], evidence={G:3, D:1})
+    >>> R.CPDs
+    [0.18918918918918917, 0.8108108108108109]
+
+
+    >>> C = Variable('Cancer', ['yes', 'no'])
+    >>> T = Variable('Test', ['pos', 'neg'])
+    >>> F11 = Factor(name='C', var=[C], CPD=[0.0001, 0.9999])
+    >>> F12 = Factor(name='T|C', var=[C,T], CPD=[0.9, 0.1, 0.2, 0.8])
+    >>> F12.CPDs
+    [0.9, 0.1, 0.2, 0.8]
+    >>> F14 = (F12.marginal(C)) * F11
+    >>> F14.CPDs
+    [0.00011000000000000002, 9e-05, 1.09989, 0.89991]
 
 '''
 
@@ -21,7 +49,7 @@ class Variable:
     Random variable is the basic building block fo Bayesian and Markov nets.
     Variable can be assigned to one of given set of values. This class
     represents discrete variable.
-    
+
     Syntax:
             >>> E = Variable("Eartquake", ['still', 'shake']);
             >>> B = Variable("Burglary",  [0, 1]);
@@ -82,7 +110,7 @@ class Variable:
         '''
         Given value finds its number among variable's values.
         If val is not in list of values, returns None
-        
+
         Syntax:
             >>> E = Variable("Eartquake", ['still', 'shake'])
             >>> E.find_value('still')
@@ -97,12 +125,12 @@ class Variable:
 
         Arguments:
             val
-                
+                one of the values of this variable
         '''
         for j in range(len(self.value)):
             if self.value[j]==val:
                 return j
-                
+
     def __abs__(self):
         '''
         Returns cardinality of the variable
@@ -130,6 +158,32 @@ class Variable:
             Eartquake
         '''
         return self.name
+
+    def equal(self, term, value):
+        '''
+        Computes indicative equality function.
+        Returns 0 if term!=value
+        Returns 1 if term==value
+        Returns None if term is not among self.value
+        Syntax:
+            >>> V = BinaryVariable("Sample")
+            >>> V.equal(0, 0)
+            1.0
+            >>> V.equal(1, 0)
+            0.0
+            >>> V.equal(2, 0)
+            >>> print V.equal(2, 0)
+            None
+
+        Arguments:
+            term
+                one of the values of this variable
+            value
+                value to be tested for equality with term
+        '''
+        if term in self.value:
+            return float(term==value)
+        return None
 
 class BinaryVariable(Variable):
     '''
@@ -162,8 +216,8 @@ class Factor:
     Represents a factor - reflection from list of all possible assignments for
     a set of variables to a float number. This can be interpreted as a joint
     probability distribution, conditional probability distribution (CPD) or a
-    unnormalized measure. 
-    
+    unnormalized measure.
+
     Syntax:
 
             E = Variable("Eartquake", ['still', 'shake']);
@@ -181,7 +235,7 @@ class Factor:
         name
             the name of the factor. This name is meant to be informal, for ex.
             "C|A,B" - means that the factro represents conditional probability
-            distribution over variable C given variables A and B. 
+            distribution over variable C given variables A and B.
         var
             list of all variables included in the factor. Order of this list
             matters for assignment, cardinlity and factor's values computing.
@@ -196,7 +250,7 @@ class Factor:
             list of included variable's cardinalities in order with respect
             to var list.
         pcard
-            list of poduct-cumulative cardinalities computed out of card list. 
+            list of poduct-cumulative cardinalities computed out of card list.
         cons
             if factor introduces new variable (see Factor.__init__() for
             details), it is stored in this field
@@ -205,7 +259,7 @@ class Factor:
             some part of var list.
         parents
             list of all factors, that are meant to be conditioning this, or are
-            parents to this according to bayesian net. 
+            parents to this according to bayesian net.
     '''
     var=[]              # переменные, входящие в фактор
     CPDs=[]             # условные вероятности
@@ -217,16 +271,16 @@ class Factor:
     name=''             # имя фактора
     def __init__(self, name='', full='', values=[], cond=[], CPD=[], var=[]):
         '''
-        
+
         Syntax:
             It is possible to define factors in two ways: with or without
             defining variables.
-            
+
             Explicit way to define variables and factors use this form:
                 # first, we difine all variables in our model
                 >>> C = Variable('Cancer', ['yes', 'no'])
                 >>> T = Variable('Test', ['pos', 'neg'])
-                
+
                 # after that, we form factors using this variables
                 >>> F11 = Factor(name='C', var=[C], CPD=[0.0001, 0.9999])
                 >>> F12 = Factor(name='T', var=[C,T], CPD=[0.9, 0.1, 0.2, 0.8])
@@ -242,7 +296,7 @@ class Factor:
                 []
                 >>> F11.name
                 'C'
-            
+
             Implicit way uses slightly different form of the constructor to
             define factors at the first place, scince variables are never needed
             outside factors' definitions:
@@ -279,15 +333,15 @@ class Factor:
                 [Cancer, Test]
                 >>> T.CPDs
                 [0.2, 0.8, 0.9, 0.1]
-            
+
             In this form, every factor's definition induces implicit variable,
-            placed in var list of the factor. 
+            placed in var list of the factor.
 
         Arguments:
             name
                 the name of the factor. This name is meant to be informal, for ex.
                 "C|A,B" - means that the factro represents conditional probability
-                distribution over variable C given variables A and B. 
+                distribution over variable C given variables A and B.
             full
                 if factor introduces new variable, this would be it's name. If
                 empty, using name argument instead
@@ -309,7 +363,7 @@ class Factor:
 
             var
                 list of all variables in the scope of the factor
-            
+
         '''
         self.CPDs = CPD
         self.pcard=[]
@@ -344,18 +398,18 @@ class Factor:
         bulds a map: hash table,
         where keys - indecies of THIS factor's assingment list
         and values - indecies of given var list assignment, corresponding to key
-        
+
         Syntax:
             >>> C = Factor(name='C', full="Cancer", values=["no", "yes"], CPD=[0.99, 0.01])
             >>> T = Factor(name='T', full="Test", values=["pos", "neg"], cond=[C], CPD=[0.2, 0.8, 0.9, 0.1])
-            
+
             >>> T.map(C.var)
             {0: 0}
-            
+
         Arguments:
             lst
                 list of variables to lookup in this var list
-            
+
         '''
         m={}
         for i in range(len(self.var)):
@@ -369,11 +423,11 @@ class Factor:
         given number of assignment, computes
         this assignment of this factor
         and returns it rearranged according to map given
-        
+
         Syntax:
             >>> C = Factor(name='C', full="Cancer", values=["no", "yes"], CPD=[0.99, 0.01])
             >>> T = Factor(name='T', full="Test", values=["pos", "neg"], cond=[C], CPD=[0.2, 0.8, 0.9, 0.1])
-            
+
             >>> m = T.map(C.var)
             >>> T.ass(0, m)
             ['no']
@@ -394,7 +448,7 @@ class Factor:
                 cardinality of a factor (Factor.pcard[0]-1). But if given out of
                 boundaries - no exceptions, computing modulo.
             mp
-                
+
         '''
         ass = self.index2ass(n)
         res = []
@@ -412,11 +466,11 @@ class Factor:
         computes a number of this asignment
 
         this number is always in range [0..Factor.pcard[0]-1]
-        
+
         Syntax:
             >>> C = Factor(name='C', full="Cancer", values=["no", "yes"], CPD=[0.99, 0.01])
             >>> T = Factor(name='T', full="Test", values=["pos", "neg"], cond=[C], CPD=[0.2, 0.8, 0.9, 0.1])
-            
+
             >>> C.ass2index(['no'])
             0
             >>> C.ass2index(['yes'])
@@ -438,15 +492,15 @@ class Factor:
               File "factors.py", line 448, in ass2index
                 res+=v.find_value(assignment[j])*self.pcard[j+1]
             TypeError: unsupported operand type(s) for *: 'NoneType' and 'int'
-                
+
         Arguments:
             assingment
                 list of values in order according to Factor.var list.
-            
+
         '''
         j=0
         res=0
-        for v in self.var:            
+        for v in self.var:
             res+=v.find_value(assignment[j])*self.pcard[j+1]
             j+=1
         return res
@@ -459,11 +513,11 @@ class Factor:
         if given index is greater than factor.pcard[0]-1
         it is equal to (index mod factor.pcard[0]).
         If assignment is not corect, raises an exception.
-        
+
         Syntax:
             >>> C = Factor(name='C', full="Cancer", values=["no", "yes"], CPD=[0.99, 0.01])
             >>> T = Factor(name='T', full="Test", values=["pos", "neg"], cond=[C], CPD=[0.2, 0.8, 0.9, 0.1])
-            
+
             >>> [{x: T.index2ass(x-1)} for x in range(6)]
             [{0: ['yes', 'neg']}, {1: ['no', 'pos']}, {2: ['no', 'neg']}, {3: ['yes', 'pos']}, {4: ['yes', 'neg']}, {5: ['no', 'pos']}]
 
@@ -472,7 +526,7 @@ class Factor:
                 number of assignment. Shoul be within 0..n, where n -
                 cardinality of a factor (Factor.pcard[0]-1). But if given out of
                 boundaries - no exceptions, computing modulo.
-            
+
         '''
         res=[]
         for j in range(len(self.var)):
@@ -484,11 +538,11 @@ class Factor:
         '''
         computes product of factors
         F(A,C)*F(C,B) = F(A,B,C)
-        
+
         Syntax:
             >>> C = Factor(name='C', full="Cancer", values=["no", "yes"], CPD=[0.99, 0.01])
             >>> T = Factor(name='T', full="Test", values=["pos", "neg"], cond=[C], CPD=[0.2, 0.8, 0.9, 0.1])
-            
+
             >>> P = T*C
             >>> P.CPDs
             [0.198, 0.792, 0.009000000000000001, 0.001]
@@ -525,7 +579,7 @@ class Factor:
         Syntax:
             >>> C = Factor(name='C', full="Cancer", values=["no", "yes"], CPD=[0.99, 0.01])
             >>> T = Factor(name='T', full="Test", values=["pos", "neg"], cond=[C], CPD=[0.2, 0.8, 0.9, 0.1])
-            
+
             >>> M = T.marginal(C.var[-1])
             >>> M.name
             'Marginal factor'
@@ -564,7 +618,7 @@ class Factor:
         Syntax:
             >>> C = Factor(name='C', full="Cancer", values=["no", "yes"], CPD=[0.99, 0.01])
             >>> T = Factor(name='T', full="Test", values=["pos", "neg"], cond=[C], CPD=[0.2, 0.8, 0.9, 0.1])
-            
+
             >>> R = T.reduce(var=C.var[-1], value='yes')
             >>> R.name
             'Marginal factor'
@@ -616,7 +670,7 @@ class Factor:
             assX = self.ass(i, mapX)
             assY = self.ass(i, mapY)
             i1 = res.ass2index(assX)
-            res.CPDs[i1] = self.CPDs[i] * float(assY[0]==value)
+            res.CPDs[i1] = self.CPDs[i] * var.equal(assY[0], value)
         return res.marginal(var)
 
     def __div__(self, other=None):
@@ -624,7 +678,7 @@ class Factor:
         Syntax:
             >>> C = Factor(name='C', full="Cancer", values=["no", "yes"], CPD=[0.99, 0.01])
             >>> T = Factor(name='T', full="Test", values=["pos", "neg"], cond=[C], CPD=[0.2, 0.8, 0.9, 0.1])
-            
+
             >>> D = (T*C)/C
             >>> D.name
             'Conditional'
@@ -655,11 +709,11 @@ class Factor:
     def __abs__(self):
         '''
         returns factor's cardianlity: product of all variables' cardinalities
-        
+
         Syntax:
             >>> C = Factor(name='C', full="Cancer", values=["no", "yes"], CPD=[0.99, 0.01])
             >>> T = Factor(name='T', full="Test", values=["pos", "neg"], cond=[C], CPD=[0.2, 0.8, 0.9, 0.1])
-            
+
             >>> abs(C)
             2
             >>> abs(T)
@@ -670,11 +724,11 @@ class Factor:
     def sum(self):
         '''
         returns sum of all factor's values
-        
+
         Syntax:
             >>> C = Factor(name='C', full="Cancer", values=["no", "yes"], CPD=[0.99, 0.01])
             >>> T = Factor(name='T', full="Test", values=["pos", "neg"], cond=[C], CPD=[0.2, 0.8, 0.9, 0.1])
-            
+
             >>> T.sum()
             2.0
             >>> C.sum()
@@ -684,13 +738,7 @@ class Factor:
 
     def __str__(self):
         '''
-        
-        '''
-        return self.name
 
-    def __repr__(self):
-        '''
-            
         '''
         res=self.name+':\n'
         res+="\tScope:\n"
@@ -711,15 +759,21 @@ class Factor:
         res+=str(self.sum())+'\n'
         return res
 
+    def __repr__(self):
+        '''
+
+        '''
+        return self.name
+
     def joint(self):
         '''
         computes joint distribution out of the factor IF it has any conditions
         i. e. computes P(A,B,C) out of P(A,B|C)
-        
+
         Syntax:
             >>> C = Factor(name='C', full="Cancer", values=["no", "yes"], CPD=[0.99, 0.01])
             >>> T = Factor(name='T', full="Test", values=["pos", "neg"], cond=[C], CPD=[0.2, 0.8, 0.9, 0.1])
-            
+
             >>> R = T.joint()
             >>> R.name
             'Product'
@@ -736,11 +790,11 @@ class Factor:
     def uncond(self):
         '''
         computes P(A,B) out of P(A,B|C,D)
-        
+
         Syntax:
             >>> C = Factor(name='C', full="Cancer", values=["no", "yes"], CPD=[0.99, 0.01])
             >>> T = Factor(name='T', full="Test", values=["pos", "neg"], cond=[C], CPD=[0.2, 0.8, 0.9, 0.1])
-            
+
             >>> R = T.uncond()
             >>> R.name
             'Marginal factor'
@@ -756,12 +810,12 @@ class Factor:
 
     def query(self, query=[], evidence=[]):
         '''
-        
-        
+
+
         Syntax:
             >>> C = Factor(name='C', full="Cancer", values=["no", "yes"], CPD=[0.99, 0.01])
             >>> T = Factor(name='T', full="Test", values=["pos", "neg"], cond=[C], CPD=[0.2, 0.8, 0.9, 0.1])
-            
+
             >>> R = T.query(query=[T], evidence=[C])
             >>> R.name
             'Conditional'
@@ -806,12 +860,12 @@ class Factor:
 
     def query2(self, query=[], evidence={}):
         '''
-        
-        
+
+
         Syntax:
             >>> C = Factor(name='C', full="Cancer", values=["no", "yes"], CPD=[0.99, 0.01])
             >>> T = Factor(name='T', full="Test", values=["pos", "neg"], cond=[C], CPD=[0.2, 0.8, 0.9, 0.1])
-            
+
             >>> R = T.query2(query=[T], evidence={C: 'yes'})
             >>> R.name
             'Marginal factor'
@@ -868,11 +922,12 @@ class Factor:
         '''
         normalizes values of the factorto make all valies sum to 1.0
         Warning: mutates the factor!
-        
+        If factor sums to 0, does nothing
+
         Syntax:
             >>> C = Factor(name='C', full="Cancer", values=["no", "yes"], CPD=[0.99, 0.01])
             >>> T = Factor(name='T', full="Test", values=["pos", "neg"], cond=[C], CPD=[0.2, 0.8, 0.9, 0.1])
-            
+
             >>> C = C.norm()
             >>> C.CPDs
             [0.99, 0.01]
@@ -881,33 +936,39 @@ class Factor:
             >>> T = T.norm()
             >>> T.CPDs
             [0.1, 0.4, 0.45, 0.05]
+            >>> A = Factor(name='null', values=[0,1], CPD=[0.0, 0.0])
+            >>> A = A.norm()
+            >>> A.CPDs
+            [0.0, 0.0]
+
         '''
         s = self.sum()
-        for i in range(len(self.CPDs)):
-            self.CPDs[i] = self.CPDs[i] / s
+        if s != 0:
+            for i in range(len(self.CPDs)):
+                self.CPDs[i] = self.CPDs[i] / s
         return self
 
 class Bayesian():
     '''
-    
-        
+
+
     Syntax:
-        
+
 
     Fields:
-        
+
     '''
     factors=[]
-    
+
     def __init__(self, factors):
         '''
-        
-        
+
+
         Syntax:
-            
+
 
         Arguments:
-            
+
         '''
         self.graph = nx.DiGraph()
         self.factors = factors
@@ -918,13 +979,13 @@ class Bayesian():
 
     def joint(self):
         '''
-        
-        
+
+
         Syntax:
-            
+
 
         Arguments:
-            
+
         '''
         res = None
         for fact in self.factors:
@@ -933,13 +994,13 @@ class Bayesian():
 
     def draw(self):
         '''
-        
-        
+
+
         Syntax:
-            
+
 
         Arguments:
-            
+
         '''
         pos = nx.pygraphviz_layout(self.graph, prog='dot')
         nx.draw(self.graph, pos, node_shape='D')
@@ -949,5 +1010,5 @@ class Bayesian():
 
 if __name__ == "__main__":
     import doctest
-    ##doctest.testmod(verbose=False)
+##    doctest.testmod(verbose=False)
     doctest.testmod(verbose=True)
