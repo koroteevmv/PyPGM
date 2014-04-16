@@ -1,0 +1,14 @@
+digraph "packages_No_Name" {
+charset="utf-8"
+rankdir=BT
+"0" [label="pypgm", shape="box"];
+"1" [label="pypgm.bayesian", shape="box"];
+"2" [label="pypgm.factor", shape="box"];
+"3" [label="pypgm.variable", shape="box"];
+"4" [label="pypgm.variable_test", shape="box"];
+"0" -> "1" [arrowhead="open", arrowtail="none"];
+"0" -> "2" [arrowhead="open", arrowtail="none"];
+"0" -> "3" [arrowhead="open", arrowtail="none"];
+"2" -> "3" [arrowhead="open", arrowtail="none"];
+"4" -> "3" [arrowhead="open", arrowtail="none"];
+}
