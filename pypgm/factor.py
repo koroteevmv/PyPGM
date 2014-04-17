@@ -5,7 +5,7 @@
     unnormalized measure.
 '''
 
-from pypgm.variable import Variable
+from .variable import Variable
 
 class Factor(object):
     '''
@@ -52,16 +52,6 @@ class Factor(object):
             list of all factors, that are meant to be conditioning this, or are
             parents to this according to bayesian net.
     '''
-
-
-    var = []              # переменные, входящие в фактор
-    cpd = []              # условные вероятности
-    card = []             # вектор разрядности переменных
-    pcard = []            # кумулятивная общая разрядность
-    cons = None           # переменная-следствие (не в случае общей вероятности)
-    cond = []             # переменные-условия
-    parents = []          # факторы-родители
-    name = ''             # имя фактора
 
     def __init__(self, name='',
                         values=None,
@@ -155,13 +145,6 @@ class Factor(object):
                 list of all variables in the scope of the factor
 
         '''
-        self.cpd = cpd
-        self.pcard = []
-        self.name = name
-        self.cond = []
-        self.parents = []
-        self.cons = None
-
         if not values:
             values = []
         if not cond:
@@ -170,6 +153,15 @@ class Factor(object):
             cpd = []
         if not var:
             var = []
+
+        self.cpd = cpd              # условные вероятности
+        self.pcard = []             # кумулятивная общая разрядность
+        self.name = name            # имя фактора
+        self.cond = []              # переменные-условия
+        self.parents = []           # факторы-родители
+        self.cons = None            # переменная-следствие (не в случае общей вероятности)
+        self.var = []               # переменные, входящие в фактор
+        self.card = []              # вектор разрядности переменных
 
         for factor in cond:
             self.cond.append(factor.var[-1])
@@ -180,7 +172,6 @@ class Factor(object):
             self.var = self.cond+var+[self.cons]
         else:
             self.var = self.cond+var
-        self.card = []
         for i in self.var:
             self.card.append(i.card)
         # counts cumulative cardinality

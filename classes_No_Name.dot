@@ -1,12 +1,10 @@
 digraph "classes_No_Name" {
 charset="utf-8"
 rankdir=BT
-"0" [label="{Bayesian|graph : DiGraph\lfactors\lfactors : list\l|joint()\ldraw()\l}", shape="record"];
+"0" [label="{Bayesian|graph : DiGraph\lfactors : NoneType, list\l|joint()\ldraw()\l}", shape="record"];
 "1" [label="{BinaryVariable|value : list\lname\lcard : int\l|}", shape="record"];
-"2" [label="{Factor|cons : NoneType\lname : str\lcpd : NoneType, list\lpcard : list\lcond : list\lvar : list\lparents : list\lcard : list\lcons : NoneType\lname : str\lcpd : list\lpcard : list\lparents : list\lvar : list\lcond : list\lcard : list\l|marginal()\lreduce()\lquery()\luncond()\lsum()\lindex2ass()\lnorm()\lass()\lmap()\lass2index()\ljoint()\lquery2()\l}", shape="record"];
-"3" [label="{TestBinaryVariable|\l|tearDown()\lsetUp()\l}", shape="record"];
-"4" [label="{TestVariable|\l|tearDown()\lsetUp()\ltestequal()\ltest__repr__()\ltest__abs__()\ltestfind_value()\l}", shape="record"];
-"5" [label="{Variable|value : list\lname\lcard\lcard : int\lname : str\lvalue : list\l|equal()\lfind_value()\l}", shape="record"];
-"1" -> "5" [arrowhead="empty", arrowtail="none"];
-"5" -> "2" [arrowhead="diamond", arrowtail="none", fontcolor="green", label="cons", style="solid"];
+"2" [label="{Factor|cons : NoneType\lname : str\lcpd : NoneType, list\lpcard : list\lcond : list\lvar : list\lparents : list\lcard : list\l|ass()\lmap()\lass2index()\lmarginal()\lsum()\lnorm()\lreduce()\ljoint()\lquery2()\lquery()\luncond()\lindex2ass()\l}", shape="record"];
+"3" [label="{Variable|value : list\lname\lcard : int\l|equal()\lfind_value()\l}", shape="record"];
+"1" -> "3" [arrowhead="empty", arrowtail="none"];
+"3" -> "2" [arrowhead="diamond", arrowtail="none", fontcolor="green", label="cons", style="solid"];
 }

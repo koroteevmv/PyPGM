@@ -1,4 +1,4 @@
-digraph "packages_No_Name" {
+digraph "packages_pypgm" {
 charset="utf-8"
 rankdir=BT
 "0" [label="pypgm", shape="box"];

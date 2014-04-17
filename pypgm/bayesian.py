@@ -7,17 +7,20 @@ class Bayesian(object):
     Fields:
 
     '''
-    factors = []
 
-    def __init__(self, factors):
+    def __init__(self, factors=None):
         '''
         Syntax:
 
         Arguments:
 
         '''
+        if not factors:
+            factors = []
+
         self.graph = nx.DiGraph()
         self.factors = factors
+
         for factor in self.factors:
             self.graph.add_node(factor.var[-1])
             for parent in factor.parents:

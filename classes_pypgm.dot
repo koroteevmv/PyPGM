@@ -1,0 +1,10 @@
+digraph "classes_pypgm" {
+charset="utf-8"
+rankdir=BT
+"0" [label="{Bayesian|graph : DiGraph\lfactors : NoneType, list\l|joint()\ldraw()\l__init__()\l}", shape="record"];
+"1" [label="{BinaryVariable|value : list\lname\lcard : int\l|__init__()\l}", shape="record"];
+"2" [label="{Factor|cons : NoneType\lname : str\lcpd : NoneType, list\lpcard : list\lcond : list\lvar : list\lparents : list\lcard : list\l|ass()\lmap()\l__repr__()\lass2index()\lmarginal()\lsum()\lnorm()\lreduce()\l__abs__()\ljoint()\l__div__()\l__mul__()\l_reduce1()\lquery2()\lquery()\luncond()\lindex2ass()\l__str__()\l__init__()\l_reduce2()\l}", shape="record"];
+"3" [label="{Variable|value : list\lname\lcard : int\l|__repr__()\lequal()\lfind_value()\l__init__()\l__abs__()\l}", shape="record"];
+"1" -> "3" [arrowhead="empty", arrowtail="none"];
+"3" -> "2" [arrowhead="diamond", arrowtail="none", fontcolor="green", label="cons", style="solid"];
+}

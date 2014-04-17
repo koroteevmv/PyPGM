@@ -23,9 +23,6 @@ class Variable(object):
             cardinality of the variable - number of all possible values
 
     '''
-    name = ""             # имя переменной
-    value = []            # значения переменной
-    card = 0            # мощность переменной
 
     def __init__(self, name, a):
         '''
@@ -52,8 +49,10 @@ class Variable(object):
                 if int,  represent number of value (cardinality). Values in this
                 case are integers from 0 to a-1.
         '''
-        self.name = name
-        self.value = []
+        self.name = name                # имя переменной
+        self.value = []                 # значения переменной
+        self.card = 0                   # мощность переменной
+
         if  type(a) == int:             # cardinality passed
             self.card = a
             for i in range(a):
