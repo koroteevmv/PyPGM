@@ -5,7 +5,8 @@
     unnormalized measure.
 '''
 
-from .variable import Variable
+import unittest
+from pypgm.variable import Variable
 
 class Factor(object):
     '''
@@ -25,7 +26,7 @@ class Factor(object):
     Fields:
         name
             the name of the factor. This name is meant to be informal, for ex.
-            "C|A,B" - means that the factro represents conditional probability
+            "C|A,B" - means that the factor represents conditional probability
             distribution over variable C given variables A and B.
         var
             list of all variables included in the factor. Order of this list
@@ -145,14 +146,10 @@ class Factor(object):
                 list of all variables in the scope of the factor
 
         '''
-        if not values:
-            values = []
-        if not cond:
-            cond = []
-        if not cpd:
-            cpd = []
-        if not var:
-            var = []
+        if not values: values = []
+        if not cond: cond = []
+        if not cpd: cpd = []
+        if not var: var = []
 
         self.cpd = cpd              # условные вероятности
         self.pcard = []             # кумулятивная общая разрядность
@@ -166,26 +163,29 @@ class Factor(object):
         for factor in cond:
             self.cond.append(factor.var[-1])
             self.parents.append(factor)
+
         if len(values) > 0:
             full = name
             self.cons = Variable(full, values)
             self.var = self.cond+var+[self.cons]
         else:
             self.var = self.cond+var
+
         for i in self.var:
             self.card.append(i.card)
+
         # counts cumulative cardinality
         for i in range(len(self.var)):
-             # actually forgot how it workes. However, tested
             self.pcard.append(reduce(lambda x, y: x*y, self.card[i:], 1))
         self.pcard.append(1)    # for compatibility
+
         if len(cpd) > 0:
             if len(cpd) != self.pcard[0]:
                 string = "Cannot build conditioned factor: " + \
                         "cpd cardinality doesn't match"
                 raise AttributeError(string)
 
-    def map(self, lst):
+    def _map(self, lst):
         '''
         bulds a map: hash table,
         where keys - indecies of THIS factor's assingment list
@@ -199,7 +199,7 @@ class Factor(object):
             ...             values=["pos", "neg"], cond=[C],
             ...             cpd=[0.2, 0.8, 0.9, 0.1])
 
-            >>> T.map(C.var)
+            >>> T._map(C.var)
             {0: 0}
 
         Arguments:
@@ -214,7 +214,7 @@ class Factor(object):
                     res[i] = j
         return res
 
-    def ass(self, number, mapping):
+    def _ass(self, number, mapping):
         '''
         given number of assignment, computes
         this assignment of this factor
@@ -228,18 +228,18 @@ class Factor(object):
             ...             values=["pos", "neg"], cond=[C],
             ...             cpd=[0.2, 0.8, 0.9, 0.1])
 
-            >>> m = T.map(C.var)
-            >>> T.ass(0, m)
+            >>> m = T._map(C.var)
+            >>> T._ass(0, m)
             ['no']
-            >>> T.ass(1, m)
+            >>> T._ass(1, m)
             ['no']
-            >>> T.ass(2, m)
+            >>> T._ass(2, m)
             ['yes']
-            >>> T.ass(3, m)
+            >>> T._ass(3, m)
             ['yes']
-            >>> T.ass(4, m)
+            >>> T._ass(4, m)
             ['no']
-            >>> T.ass(-1, m)
+            >>> T._ass(-1, m)
             ['yes']
 
         Arguments:
@@ -250,16 +250,18 @@ class Factor(object):
             mapping
 
         '''
-        ass = self.index2ass(number)
+        ass = self._index2ass(number)
         res = []
         for i in range(len(mapping)):
             res.append(None)
         for i in range(len(ass)):
             if i in mapping.keys():
+                mapping[i]
+                ass[i]
                 res[mapping[i]] = ass[i]
         return res
 
-    def ass2index(self, assignment):
+    def _ass2index(self, assignment):
         '''
         given a list of values of factor's vars
         in order according to factor.var
@@ -275,17 +277,17 @@ class Factor(object):
             ...             values=["pos", "neg"], cond=[C],
             ...             cpd=[0.2, 0.8, 0.9, 0.1])
 
-            >>> C.ass2index(['no'])
+            >>> C._ass2index(['no'])
             0
-            >>> C.ass2index(['yes'])
+            >>> C._ass2index(['yes'])
             1
-            >>> T.ass2index(['yes', 'pos'])
+            >>> T._ass2index(['yes', 'pos'])
             2
-            >>> T.ass2index(['yes', 'neg'])
+            >>> T._ass2index(['yes', 'neg'])
             3
-            >>> T.ass2index(['no', 'neg'])
+            >>> T._ass2index(['no', 'neg'])
             1
-            >>> T.ass2index(['no', 'pos'])
+            >>> T._ass2index(['no', 'pos'])
             0
 
         Arguments:
@@ -300,7 +302,7 @@ class Factor(object):
             j += 1
         return res
 
-    def index2ass(self, index):
+    def _index2ass(self, index):
         '''
         given a number computes an assignment -
         list of variables' values in order of factor.var
@@ -317,7 +319,7 @@ class Factor(object):
             ...             values=["pos", "neg"], cond=[C],
             ...             cpd=[0.2, 0.8, 0.9, 0.1])
 
-            >>> [{x: T.index2ass(x-1)} for x in range(6)][0]
+            >>> [{x: T._index2ass(x-1)} for x in range(6)][0]
             {0: ['yes', 'neg']}
 
         Arguments:
@@ -362,14 +364,14 @@ class Factor(object):
                     var=sorted(list(set(self.var) | set(other.var)),
                                 cmp=lambda x, y: cmp(x.name, y.name)),
                     cpd=[])
-        map_s = res.map(self.var)
-        map_o = res.map(other.var)
+        map_s = res._map(self.var)
+        map_o = res._map(other.var)
         res.cpd = []
         for i in range(res.pcard[0]):
             res.cpd.append(0)
         for i in range(res.pcard[0]):
-            self_ind = self.ass2index(res.ass(i, map_s))
-            other_ind = other.ass2index(res.ass(i, map_o))
+            self_ind = self._ass2index(res._ass(i, map_s))
+            other_ind = other._ass2index(res._ass(i, map_o))
             res.cpd[i] = (self.cpd[self_ind] * other.cpd[other_ind])
         return res
 
@@ -408,11 +410,11 @@ class Factor(object):
                         var=sorted(list(set(self.var) - set([var])),
                                         cmp=lambda x, y: cmp(x.name, y.name)),
                         cpd=[])
-        map_x = self.map(res.var)
+        map_x = self._map(res.var)
         for i in range(res.pcard[0]):
             res.cpd.append(0)
         for i in range(len(self.cpd)):
-            ind = res.ass2index(self.ass(i, map_x))
+            ind = res._ass2index(self._ass(i, map_x))
             res.cpd[ind] += self.cpd[i]
         return res
 
@@ -444,7 +446,7 @@ class Factor(object):
             >>> R.cpd
             [0.18181818181818182, 0.8181818181818181]
         '''
-        return self._reduce2(var, value).norm()
+        return self._reduce2(var=var, value=value)._norm()
 
     def _reduce1(self, var=None, value=''):
         '''
@@ -460,14 +462,14 @@ class Factor(object):
                         var=sorted(list(set(self.var) - set([var])),
                                         cmp=lambda x, y: cmp(x.name, y.name)),
                         cpd=[])
-        map_x = self.map(res.var)
-        map_y = self.map([var])
+        map_x = self._map(res.var)
+        map_y = self._map([var])
         for i in range(res.pcard[0]):
             res.cpd.append(0)
         for i in range(len(self.cpd)):
-            ass_x = self.ass(i, map_x)
-            ass_y = self.ass(i, map_y)
-            ind = res.ass2index(ass_x)
+            ass_x = self._ass(i, map_x)
+            ass_y = self._ass(i, map_y)
+            ind = res._ass2index(ass_x)
             if ass_y[0] == value:
                 res.cpd[ind] = self.cpd[i]
         return res
@@ -485,14 +487,14 @@ class Factor(object):
         res = Factor(name='Reduced',
                         var=self.var,
                         cpd=[])
-        map_x = self.map(res.var)
-        map_y = self.map([var])
+        map_x = self._map(res.var)
+        map_y = self._map([var])
         for i in range(res.pcard[0]):
             res.cpd.append(0)
         for i in range(len(self.cpd)):
-            ass_x = self.ass(i, map_x)
-            ass_y = self.ass(i, map_y)
-            ind = res.ass2index(ass_x)
+            ass_x = self._ass(i, map_x)
+            ass_y = self._ass(i, map_y)
+            ind = res._ass2index(ass_x)
             res.cpd[ind] = self.cpd[i] * var.equal(ass_y[0], value)
         return res.marginal(var)
 
@@ -517,26 +519,48 @@ class Factor(object):
             [0.2, 0.8, 0.9000000000000001, 0.1]
 
         '''
-        var = other.var[-1]
+        t = list(set(other.var) - set(other.cond))
+        var = t[-1]
         if not var in self.var:
             raise AttributeError()
+##        print "------------------------"
+##        print self.var, t
 
         res = Factor(name='Conditional',
-                        var=sorted(list(set(self.var)-set(other.var)),
+                        var=sorted(list(set(self.var)-set(t)),
                                         cmp=lambda x, y: cmp(x.name, y.name)),
                         cond=[other],
                         cpd=[])
-        map_y = self.map([var])
+
         for i in range(res.pcard[0]):
             res.cpd.append(0)
-        for i in range(len(self.cpd)):
-            ass_y = self.ass(i, map_y)
-            res.cpd[i] = self.cpd[i]/other.cpd[other.ass2index(ass_y)]
+
+        temp = Factor(var=sorted(list(set(self.var) - set(t))))
+        for i in range(temp.pcard[0]):
+            temp.cpd.append(0)
+
+        map_to_temp = self._map(temp.var)
+        map_from_temp = temp._map(self.var)
+
+        for i in range(self.pcard[0]):
+            temp_ass = self._ass(i, map_to_temp)
+            temp_index = temp._ass2index(temp_ass)
+            temp.cpd[temp_index] += self.cpd[i]
+
+##        print self
+##        print res
+##        print temp
+##        print "------------------------"
+
+        for i in range(self.pcard[0]):
+            temp_ass = self._ass(i, map_to_temp)
+            temp_index = temp._ass2index(temp_ass)
+            res.cpd[i] = self.cpd[i] / temp.cpd[temp_index]
         return res
 
     def __abs__(self):
         '''
-        returns factor's cardianlity: product of all variables' cardinalities
+        returns factor's cardinality: product of all variables' cardinalities
 
         Syntax:
             >>> C = Factor(name='Cancer',
@@ -589,7 +613,7 @@ class Factor(object):
         res += "\tcpd:\n"
         for j in range(len(self.cpd)):
             res += '\t\t'+str(j)+'->'
-            for i in self.index2ass(j):
+            for i in self._index2ass(j):
                 res += str(i)+", "
             res += str(self.cpd[j])+'\n'
         res += str(self.sum())+'\n'
@@ -652,10 +676,8 @@ class Factor(object):
             res = res.marginal(fact.uncond().var[-1])
         return res
 
-    def query(self, query=None, evidence=None):
+    def _query1(self, query=None, evidence=None):
         '''
-
-
         Syntax:
             >>> C = Factor(name='Cancer',
             ...             values=["no", "yes"],
@@ -664,7 +686,7 @@ class Factor(object):
             ...             values=["pos", "neg"], cond=[C],
             ...             cpd=[0.2, 0.8, 0.9, 0.1])
 
-            >>> R = T.query(query=[T], evidence=[C])
+            >>> R = T._query1(query=[T], evidence=[C])
             >>> R.name
             'Conditional'
             >>> R.var
@@ -673,7 +695,7 @@ class Factor(object):
             [0.2, 0.8, 0.9000000000000001, 0.1]
             >>> R.cond
             [Cancer]
-            >>> R = T.query(query=[C], evidence=[T])
+            >>> R = T._query1(query=[C], evidence=[T])
             >>> R.name
             'Conditional'
             >>> R.var
@@ -682,7 +704,7 @@ class Factor(object):
             0.9565217391304347
             >>> R.cond
             [Test]
-            >>> R = T.query(query=[C], evidence=[])
+            >>> R = T._query1(query=[C], evidence=[])
             >>> R.name
             'Marginal factor'
             >>> R.var
@@ -708,11 +730,12 @@ class Factor(object):
         hidden = set(res.var) - set(query_) - set(evid)
         for hid in hidden:
             res = res.marginal(hid)
-        for evid in evidence:
-            res = res / evid.uncond()
+##        for evid in evidence:
+##            print "/////////////", evid.name
+##            res = res / evid
         return res
 
-    def query2(self, query=None, evidence=None):
+    def _query2(self, query=None, evidence=None):
         '''
         Syntax:
             >>> C = Factor(name='Cancer',
@@ -722,7 +745,7 @@ class Factor(object):
             ...             values=["pos", "neg"], cond=[C],
             ...             cpd=[0.2, 0.8, 0.9, 0.1])
 
-            >>> R = T.query2(query=[T], evidence={C: 'yes'})
+            >>> R = T._query2(query=[T], evidence={C: 'yes'})
             >>> R.name
             'Marginal factor'
             >>> R.var
@@ -731,7 +754,7 @@ class Factor(object):
             []
             >>> R.cpd
             [0.9, 0.09999999999999999]
-            >>> R = T.query2(query=[T], evidence={C: 'no'})
+            >>> R = T._query2(query=[T], evidence={C: 'no'})
             >>> R.name
             'Marginal factor'
             >>> R.var
@@ -740,7 +763,7 @@ class Factor(object):
             []
             >>> R.cpd
             [0.2, 0.8]
-            >>> R = T.query2(query=[C], evidence={T: 'pos'})
+            >>> R = T._query2(query=[C], evidence={T: 'pos'})
             >>> R.name
             'Marginal factor'
             >>> R.var
@@ -749,7 +772,7 @@ class Factor(object):
             []
             >>> R.cpd
             [0.9565217391304348, 0.04347826086956522]
-            >>> R = T.query2(query=[C], evidence={})
+            >>> R = T._query2(query=[C], evidence={})
             >>> R.name
             'Marginal factor'
             >>> R.var
@@ -777,10 +800,28 @@ class Factor(object):
         for hidden in hiddens:
             res = res.marginal(hidden)
         for evid_name in evid_names.keys():
-            res = res.reduce(var=evid_name, value=evid_names[evid_name]).norm()
+            res = res.reduce(var=evid_name, value=evid_names[evid_name])._norm()
         return res
 
-    def norm(self):
+    def query(self, query=None, evidence=None):
+        if isinstance(evidence, dict):
+            return self._query3(query, evidence)
+        return self._query1(query, evidence)
+
+    def _query3(self, query=None, evidence=None):
+        if not query:
+            query = []
+        if not evidence:
+            evidence = {}
+
+        res = self._query1(query, evidence.keys())
+
+        for (var, val) in evidence.iteritems():
+            res = res.reduce(var=var.var[-1], value=val)
+
+        return res
+
+    def _norm(self):
         '''
         normalizes values of the factorto make all valies sum to 1.0
         Warning: mutates the factor!
@@ -794,16 +835,16 @@ class Factor(object):
             ...             values=["pos", "neg"], cond=[C],
             ...             cpd=[0.2, 0.8, 0.9, 0.1])
 
-            >>> C = C.norm()
+            >>> C = C._norm()
             >>> C.cpd
             [0.99, 0.01]
             >>> T.cpd
             [0.2, 0.8, 0.9, 0.1]
-            >>> T = T.norm()
+            >>> T = T._norm()
             >>> T.cpd
             [0.1, 0.4, 0.45, 0.05]
             >>> A = Factor(name='null', values=[0,1], cpd=[0.0, 0.0])
-            >>> A = A.norm()
+            >>> A = A._norm()
             >>> A.cpd
             [0.0, 0.0]
 
@@ -813,6 +854,173 @@ class Factor(object):
             for i in range(len(self.cpd)):
                 self.cpd[i] = self.cpd[i] / sum_
         return self
+
+
+class TestFactor(unittest.TestCase):
+
+    def setUp(self):
+        self.C = Factor(name='Cancer',
+                        values=["no", "yes"],
+                        cpd=[0.99, 0.01])
+        self.T = Factor(name='Test',
+                        values=["pos", "neg"], cond=[self.C],
+                        cpd=[0.2, 0.8, 0.9, 0.1])
+
+        self.m =  self.C._map(self.T.var)
+
+    def tearDown(self):
+        pass
+
+    def test_var(self):
+        self.assertEqual(1, len(self.C.var))
+        self.assertEqual('Cancer', self.C.var[0].name)
+
+        self.assertEqual(2, len(self.T.var))
+        self.assertEqual('Cancer', self.T.var[0].name)
+        self.assertEqual('Test', self.T.var[1].name)
+
+    def test_card(self):
+        self.assertEqual(2, len(self.C.pcard))
+        self.assertEqual(2, self.C.pcard[0])
+
+        self.assertEqual(3, len(self.T.pcard))
+        self.assertEqual(4, self.T.pcard[0])
+
+    def test_cpd(self):
+        self.assertEqual(2, len(self.C.cpd))
+        self.assertEqual(0.99, self.C.cpd[0])
+        self.assertEqual(0.01, self.C.cpd[1])
+
+        self.assertEqual(4, len(self.T.cpd))
+        self.assertEqual(0.2, self.T.cpd[0])
+        self.assertEqual(0.8, self.T.cpd[1])
+        self.assertEqual(0.9, self.T.cpd[2])
+        self.assertEqual(0.1, self.T.cpd[3])
+
+    def test_map(self):
+        self.assertEqual(1, len(self.m))
+        self.assertEqual(0, self.m[0])
+
+    def test_ass(self):
+        self.assertEqual(['no'], self.T._ass(0, self.m))
+        self.assertEqual(['no'], self.T._ass(1, self.m))
+        self.assertEqual(['yes'], self.T._ass(2, self.m))
+        self.assertEqual(['yes'], self.T._ass(-1, self.m))
+        self.assertEqual(['no'], self.T._ass(4, self.m))
+
+    def test_ass2index(self):
+        self.assertEqual(self.C._ass2index(['no']), 0)
+        self.assertEqual(self.C._ass2index(['yes']), 1)
+
+        self.assertEqual(self.T._ass2index(['no', 'pos']), 0)
+        self.assertEqual(self.T._ass2index(['no', 'neg']), 1)
+        self.assertEqual(self.T._ass2index(['yes', 'pos']), 2)
+        self.assertEqual(self.T._ass2index(['yes', 'neg']), 3)
+
+    def test_index2ass(self):
+        self.assertEqual(['no'], self.C._index2ass(0))
+        self.assertEqual(['yes'], self.C._index2ass(1))
+
+        self.assertEqual(['no', 'neg'], self.T._index2ass(1))
+        self.assertEqual(['yes', 'neg'], self.T._index2ass(3))
+        self.assertEqual(['no', 'pos'], self.T._index2ass(0))
+        self.assertEqual(['yes', 'pos'], self.T._index2ass(2))
+
+    def test__mul__(self):
+        P = self.C * self.T
+        self.assertEqual(4, len(P.cpd))
+        self.assertAlmostEqual(0.198, P.cpd[0])
+        self.assertAlmostEqual(0.001, P.cpd[3])
+        self.assertEqual(2, len(P.var))
+        self.assertEqual('Cancer', P.var[0].name)
+        self.assertEqual('Test', P.var[1].name)
+
+    def testmarginal(self):
+        M = self.T.marginal(self.C.var[-1])
+        self.assertEqual(2, len(M.cpd))
+        self.assertAlmostEqual(1.1, M.cpd[0])
+        self.assertAlmostEqual(0.9, M.cpd[1])
+        self.assertEqual(1, len(M.var))
+        self.assertEqual('Test', M.var[0].name)
+
+        M = self.T.marginal(self.T.var[-1])
+        self.assertEqual(2, len(M.cpd))
+        self.assertAlmostEqual(1.0, M.cpd[0])
+        self.assertAlmostEqual(1.0, M.cpd[1])
+        self.assertEqual(1, len(M.var))
+        self.assertEqual('Cancer', M.var[0].name)
+
+    def testreduce(self):
+        M = self.T.reduce(var=self.C.var[-1], value='yes')
+        self.assertEqual(2, len(M.cpd))
+        self.assertAlmostEqual(0.9, M.cpd[0])
+        self.assertAlmostEqual(0.1, M.cpd[1])
+        self.assertEqual(1, len(M.var))
+        self.assertEqual('Test', M.var[0].name)
+
+        M = self.T.reduce(var=self.C.var[-1], value='no')
+        self.assertEqual(2, len(M.cpd))
+        self.assertAlmostEqual(0.2, M.cpd[0])
+        self.assertAlmostEqual(0.8, M.cpd[1])
+        self.assertEqual(1, len(M.var))
+        self.assertEqual('Test', M.var[0].name)
+
+    def test__div__(self):
+        M = (self.T*self.C)/self.C
+        self.assertEqual(4, len(M.cpd))
+        self.assertAlmostEqual(0.2, M.cpd[0])
+        self.assertAlmostEqual(0.8, M.cpd[1])
+        self.assertAlmostEqual(0.9, M.cpd[2])
+        self.assertAlmostEqual(0.1, M.cpd[3])
+        self.assertEqual(2, len(M.var))
+        self.assertEqual('Cancer', M.var[0].name)
+        self.assertEqual('Test', M.var[1].name)
+
+    def test__abs__(self):
+        self.assertEqual(2, abs(self.C))
+        self.assertEqual(4, abs(self.T))
+
+    def testsum(self):
+        self.assertEqual(1.0, self.C.sum())
+        self.assertEqual(2.0, self.T.sum())
+
+    def testjoint(self):
+        M = self.T.joint()
+        self.assertEqual(4, len(M.cpd))
+        self.assertAlmostEqual(0.198, M.cpd[0])
+        self.assertAlmostEqual(0.792, M.cpd[1])
+        self.assertAlmostEqual(0.009, M.cpd[2])
+        self.assertAlmostEqual(0.001, M.cpd[3])
+        self.assertEqual(2, len(M.var))
+        self.assertEqual('Cancer', M.var[0].name)
+        self.assertEqual('Test', M.var[1].name)
+
+    def testuncond(self):
+        M = self.T.uncond()
+        self.assertEqual(2, len(M.cpd))
+        self.assertAlmostEqual(0.207, M.cpd[0])
+        self.assertAlmostEqual(0.793, M.cpd[1])
+        self.assertEqual(1, len(M.var))
+        self.assertEqual('Test', M.var[0].name)
+
+    def testquery(self):
+        M = self.T.query(query=[self.C], evidence={self.T: 'pos'})
+        self.assertEqual(2, len(M.cpd))
+        self.assertAlmostEqual(0.9565217391304348, M.cpd[0])
+        self.assertAlmostEqual(0.04347826086956522, M.cpd[1])
+        self.assertEqual(1, len(M.var))
+        self.assertEqual('Cancer', M.var[0].name)
+
+    def test_norm(self):
+        M = self.T._norm()
+        self.assertEqual(4, len(M.cpd))
+        self.assertAlmostEqual(0.1, M.cpd[0])
+        self.assertAlmostEqual(0.4, M.cpd[1])
+        self.assertAlmostEqual(0.45, M.cpd[2])
+        self.assertAlmostEqual(0.05, M.cpd[3])
+        self.assertEqual(2, len(M.var))
+        self.assertEqual('Cancer', M.var[0].name)
+        self.assertEqual('Test', M.var[1].name)
 
 
 if __name__ == "__main__":
