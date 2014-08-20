@@ -13,7 +13,8 @@
 inference.py
 '''
 
-from pypgm import Factor, Bayesian
+from pypgm import Factor
+from pypgm import Bayesian
 
 
 def cancer_example():
@@ -29,16 +30,18 @@ def cancer_example():
 ##    print T.joint()
 ##    print T.uncond()
 ##    R = T.query(query=[C], evidence={T:'pos'})
-    print T._query2(query=[C], evidence={T:'pos'})
+    print "First algorithm"
     print T._query1(query=[C], evidence=[T])
-    print T._query3(query=[C], evidence={T:'pos'})
+    print "Second algorithm"
+    print T._query2(query=[C], evidence=[T])
+##    print T*C
 
 def student_example():
     '''
     bayesian_inference
     '''
     D = Factor(name='Difficulty', values=[0, 1], cpd=[0.6, 0.4])
-    I = Factor(name='Intelligence', values=[0, 1], cpd=[0.7, 0.3])
+    I = Factor(name='Intelligence', values=['low', 'high'], cpd=[0.7, 0.3])
     G = Factor(name='Grade|I,D', values=[1, 2, 3],
                 cond=[D, I], cpd=[0.3, 0.4, 0.3,
                                 0.05, 0.25, 0.7,
@@ -52,6 +55,9 @@ def student_example():
     BN = Bayesian([D, I, S, G, L])
 
     print  BN.joint().query(query=[I], evidence={G:3, D:1})
+    print  BN.joint().query(query=[I], evidence=[G, D])
+    print  BN.joint().query(query=[I], evidence=[D])
+    print  BN.joint().query(query=[I], evidence=[G])
 
 def bayesian_inference():
     '''
@@ -98,28 +104,47 @@ def local_inference():
     F = Factor(name='F', values=[0, 1], cond=[E], cpd=[0.6, 0.4, 0.3, 0.7])
     G = Factor(name='G', values=[0, 1], cond=[F], cpd=[0.6, 0.4, 0.3, 0.7])
 
-    print D.query(query=[D], evidence={C:0})
-    print D._query2(query=[D], evidence={C:0})
-    print D._query3(query=[D], evidence={C:0})
-##    P = D*C
-##    print P
-##    print P.reduce(var=C.var[-1], value=0)
-##    print P.reduce(var=C.var[-1], value=0).marginal(var=B.var[-1])
+##    print A.uncond()
+##    print B.uncond()
+##    print C.uncond()
+##    print D.uncond()
+##    print E.uncond()
+##    print F.uncond()
+
+##    print B.uncond()
+##    print B.query(query=[B], evidence=[])
+##    print (B*A).marginal(var=A.cons)
+
+##    print C.uncond()
+##    print C.query(query=[C], evidence=[])
+
+##    print C.query(query=[C], evidence=[B])
+##    print C
+
+    print C._query2(query=[C], evidence=[A, B])
+##    print C.uncond()
+##    print (C*B*A).marginal(A.cons).marginal(B.cons)
+##    print (C*D).marginal(var=D.cons)
+##    print C.query(query=[C], evidence=[A, B])
 
 
-##    A = Factor(name='A', values=[0, 1], cpd=[0.001, 0.999])
-##    B = Factor(name='B', values=[0, 1], cond=[A], cpd=[0.96, 0.04, 0.93, 0.07])
-##    C = Factor(name='C', values=[0, 1], cond=[B], cpd=[0.96, 0.04, 0.93, 0.07])
-##    D = Factor(name='D', values=[0, 1], cond=[C], cpd=[0.96, 0.04, 0.93, 0.07])
-##    E = Factor(name='E', values=[0, 1], cond=[D], cpd=[0.96, 0.04, 0.93, 0.07])
-##    F = Factor(name='F', values=[0, 1], cond=[E], cpd=[0.96, 0.04, 0.93, 0.07])
-##    G = Factor(name='G', values=[0, 1], cond=[F], cpd=[0.96, 0.04, 0.93, 0.07])
+    A = Factor(name='A', values=[0, 1], cpd=[0.01, 0.99])
+    B = Factor(name='B', values=[0, 1], cond=[A], cpd=[0.96, 0.04, 0.93, 0.07])
+    C = Factor(name='C', values=[0, 1], cond=[B], cpd=[0.96, 0.04, 0.93, 0.07])
+    D = Factor(name='D', values=[0, 1], cond=[C], cpd=[0.96, 0.04, 0.93, 0.07])
+    E = Factor(name='E', values=[0, 1], cond=[D], cpd=[0.96, 0.04, 0.93, 0.07])
+    F = Factor(name='F', values=[0, 1], cond=[E], cpd=[0.96, 0.04, 0.93, 0.07])
+    G = Factor(name='G', values=[0, 1], cond=[F], cpd=[0.96, 0.04, 0.93, 0.07])
 
-##    print G
+##    print C*D
+
+##    print G.uncond(1)
+##    print G.uncond(2)
+##    print G.uncond(3)
+##    print G.uncond(4)
+##    print G.uncond(5)
+##    print G.uncond(6)
 ##    print G.uncond()
-##    print G.joint()
-##    print G.query(query=[G], evidence={F: 0})
-##    print G.query(query=[G], evidence={F: 1})
 
 
 local_inference()

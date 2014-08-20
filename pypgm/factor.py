@@ -86,7 +86,7 @@ class Factor(object):
                 'C'
 
             Implicit way uses slightly different form of the constructor to
-            define factors at the first place, scince variables are never needed
+            define factors at the first place, since variables are never needed
             outside factors' definitions:
                 >>> C = Factor(name='Cancer', values=["no", "yes"],
                 ...             cpd=[0.99, 0.01])
@@ -152,13 +152,14 @@ class Factor(object):
         if not var: var = []
 
         self.cpd = cpd              # условные вероятности
-        self.pcard = []             # кумулятивная общая разрядность
         self.name = name            # имя фактора
+        self.cons = None            # основная факторная переменная (не в случае общей вероятности)
+        self.pcard = []             # кумулятивная общая разрядность
         self.cond = []              # переменные-условия
         self.parents = []           # факторы-родители
-        self.cons = None            # переменная-следствие (не в случае общей вероятности)
         self.var = []               # переменные, входящие в фактор
         self.card = []              # вектор разрядности переменных
+        self._uncond_cache = None
 
         for factor in cond:
             self.cond.append(factor.var[-1])
@@ -360,10 +361,14 @@ class Factor(object):
         '''
         if other == None:         # for compatibility
             return self
+##        print "Product"
+##        print self.var, self.cond
+##        print other.var, other.cond
+##        print (set(self.var) | set(other.var)) - set(other.cond)
         res = Factor(name='Product',
-                    var=sorted(list(set(self.var) | set(other.var)),
-                                cmp=lambda x, y: cmp(x.name, y.name)),
-                    cpd=[])
+                    var=sorted(list((set(self.var) | set(other.var)) - set(other.cond)),
+                            cmp=lambda x, y: cmp(x.name, y.name)),
+                    cpd=[], cond=other.parents)
         map_s = res._map(self.var)
         map_o = res._map(other.var)
         res.cpd = []
@@ -515,47 +520,55 @@ class Factor(object):
             [Cancer, Test]
             >>> D.cond
             [Cancer]
-            >>> D.cpd
-            [0.2, 0.8, 0.9000000000000001, 0.1]
+            >>> D.cpd[0]
+            0.2
 
         '''
         t = list(set(other.var) - set(other.cond))
         var = t[-1]
         if not var in self.var:
             raise AttributeError()
+
 ##        print "------------------------"
 ##        print self.var, t
+##        print "Initial division"
+##        print self
 
         res = Factor(name='Conditional',
-                        var=sorted(list(set(self.var)-set(t)),
-                                        cmp=lambda x, y: cmp(x.name, y.name)),
-                        cond=[other],
+                        var=list(set(self.var) - set(t)),
+                        cond=list(set([other]) | set(self.parents)),
                         cpd=[])
 
         for i in range(res.pcard[0]):
             res.cpd.append(0)
 
-        temp = Factor(var=sorted(list(set(self.var) - set(t))))
+        temp = Factor(var=t)
         for i in range(temp.pcard[0]):
             temp.cpd.append(0)
 
         map_to_temp = self._map(temp.var)
-        map_from_temp = temp._map(self.var)
 
         for i in range(self.pcard[0]):
             temp_ass = self._ass(i, map_to_temp)
             temp_index = temp._ass2index(temp_ass)
             temp.cpd[temp_index] += self.cpd[i]
 
-##        print self
-##        print res
+##        print "Temp factor"
 ##        print temp
-##        print "------------------------"
+
+        map_to_res = self._map(res.var)
+        map_from_res = res._map(self.var)
+##        print map_to_res, map_from_res
 
         for i in range(self.pcard[0]):
             temp_ass = self._ass(i, map_to_temp)
             temp_index = temp._ass2index(temp_ass)
-            res.cpd[i] = self.cpd[i] / temp.cpd[temp_index]
+            res_ass = self._ass(i, map_to_res)
+            j = res._ass2index(res_ass)
+            res.cpd[j] = self.cpd[i] / temp.cpd[temp_index]
+
+##        print "------------------------"
+
         return res
 
     def __abs__(self):
@@ -651,7 +664,7 @@ class Factor(object):
             res = res * parent.joint()
         return res
 
-    def uncond(self):
+    def uncond(self, depth=-1):
         '''
         computes P(A,B) out of P(A,B|C,D)
 
@@ -671,71 +684,107 @@ class Factor(object):
             >>> R.cpd
             [0.20700000000000002, 0.793]
         '''
-        res = self.joint()
-        for fact in self.parents:
-            res = res.marginal(fact.uncond().var[-1])
+
+        if self._uncond_cache:  return self._uncond_cache
+
+##        print "Computing unconditioned of", self.name
+##        res = self.joint()
+##        for fact in self.parents:
+##            res = res.marginal(fact.var[-1])
+##        self._uncond_cache = res
+##        return res
+
+        res = self
+
+        if depth == -1:
+            for fact in self.parents:
+                res = res * fact.uncond(depth=-1)
+                res = res.marginal(fact.cons)
+        elif depth == 0:
+            for fact in self.parents:
+                temp = Factor(name=fact.name+'_temp', var=[fact.cons])
+                for i in xrange(temp.pcard[0]):
+                    temp.cpd.append(1.0 / temp.pcard[0])
+                res = res * temp
+                res = res.marginal(fact.cons)
+        else:
+            for fact in self.parents:
+                res = res * fact.uncond(depth=depth-1)
+                res = res.marginal(fact.cons)
+
+        if depth == -1:
+            self._uncond_cache = res
+
         return res
 
     def _query1(self, query=None, evidence=None):
-        '''
-        Syntax:
-            >>> C = Factor(name='Cancer',
-            ...             values=["no", "yes"],
-            ...             cpd=[0.99, 0.01])
-            >>> T = Factor(name='Test',
-            ...             values=["pos", "neg"], cond=[C],
-            ...             cpd=[0.2, 0.8, 0.9, 0.1])
 
-            >>> R = T._query1(query=[T], evidence=[C])
-            >>> R.name
-            'Conditional'
-            >>> R.var
-            [Cancer, Test]
-            >>> R.cpd
-            [0.2, 0.8, 0.9000000000000001, 0.1]
-            >>> R.cond
-            [Cancer]
-            >>> R = T._query1(query=[C], evidence=[T])
-            >>> R.name
-            'Conditional'
-            >>> R.var
-            [Test, Cancer]
-            >>> R.cpd[0]
-            0.9565217391304347
-            >>> R.cond
-            [Test]
-            >>> R = T._query1(query=[C], evidence=[])
-            >>> R.name
-            'Marginal factor'
-            >>> R.var
-            [Cancer]
-            >>> R.cond
-            []
-            >>> R.cpd
-            [0.99, 0.010000000000000002]
-        '''
-
-        if not query:
-            query = []
-        if not evidence:
-            evidence = []
+        if not query:  query = []
+        if not evidence:  evidence = []
 
         res = self.joint()
+
         query_ = []
-        for i in query:
-            query_.append(i.var[-1])
+        for i in query:  query_.append(i.var[-1])
         evid = []
-        for evid_ in evidence:
-            evid.append(evid_.var[-1])
+        for i in evidence:  evid.append(i.var[-1])
         hidden = set(res.var) - set(query_) - set(evid)
-        for hid in hidden:
-            res = res.marginal(hid)
-##        for evid in evidence:
-##            print "/////////////", evid.name
-##            res = res / evid
+
+        for hid in hidden:  res = res.marginal(hid)
+        for evid in evidence:  res = res / evid
+
         return res
 
-    def _query2(self, query=None, evidence=None):
+    def _query2(self, query=None, evidence=None, depth=-1):
+
+        if not query:  query = []
+        if not evidence:  evidence = []
+
+        res = self
+
+##        print ">>>>>>>>>>>", self.name, self.parents
+##        print query, evidence
+        for fact in self.parents:
+##            print fact.name
+            if not fact in evidence:
+##                print "Product"
+                if fact._uncond_cache:
+##                    print "From cache"
+                    res = res * fact._uncond_cache
+                else:
+                    if depth == 0:
+                        temp = Factor(name=fact.name+'_temp', var=[fact.cons])
+                        for i in xrange(temp.pcard[0]):
+                            temp.cpd.append(1.0 / temp.pcard[0])
+                        res = res * temp
+                    else:
+                        res = res * fact._query2([fact], evidence, depth-1)
+            if not fact in query:
+                if fact in evidence:
+                    res = res / fact
+                else:
+                    res = res.marginal(fact.cons)
+
+##        print "After product:"
+##        print res
+
+        if not self in query:
+            if self in evidence:
+##                print self.name, "I'm from evidence, divide"
+                res = res / self
+            else:
+##                print self.name, "I'm from hidden, margin"
+                res = res.marginal(self.cons)
+##        else:
+##            print self.name, "I'm from query, skip"
+
+##        print "After that:"
+##        print res
+##        print "<<<<<<<<<<<<<<<<<<<<<<<<"
+
+        return res
+
+    def query(self, query=None, evidence=None):
         '''
         Syntax:
             >>> C = Factor(name='Cancer',
@@ -745,7 +794,7 @@ class Factor(object):
             ...             values=["pos", "neg"], cond=[C],
             ...             cpd=[0.2, 0.8, 0.9, 0.1])
 
-            >>> R = T._query2(query=[T], evidence={C: 'yes'})
+            >>> R = T.query(query=[T], evidence={C: 'yes'})
             >>> R.name
             'Marginal factor'
             >>> R.var
@@ -754,7 +803,7 @@ class Factor(object):
             []
             >>> R.cpd
             [0.9, 0.09999999999999999]
-            >>> R = T._query2(query=[T], evidence={C: 'no'})
+            >>> R = T.query(query=[T], evidence={C: 'no'})
             >>> R.name
             'Marginal factor'
             >>> R.var
@@ -763,7 +812,7 @@ class Factor(object):
             []
             >>> R.cpd
             [0.2, 0.8]
-            >>> R = T._query2(query=[C], evidence={T: 'pos'})
+            >>> R = T.query(query=[C], evidence={T: 'pos'})
             >>> R.name
             'Marginal factor'
             >>> R.var
@@ -772,7 +821,43 @@ class Factor(object):
             []
             >>> R.cpd
             [0.9565217391304348, 0.04347826086956522]
-            >>> R = T._query2(query=[C], evidence={})
+            >>> R = T.query(query=[C], evidence={})
+            >>> R.name
+            'Marginal factor'
+            >>> R.var
+            [Cancer]
+            >>> R.cond
+            []
+            >>> R.cpd
+            [0.99, 0.010000000000000002]
+
+
+            >>> C = Factor(name='Cancer',
+            ...             values=["no", "yes"],
+            ...             cpd=[0.99, 0.01])
+            >>> T = Factor(name='Test',
+            ...             values=["pos", "neg"], cond=[C],
+            ...             cpd=[0.2, 0.8, 0.9, 0.1])
+
+            >>> R = T.query(query=[T], evidence=[C])
+            >>> R.name
+            'Conditional'
+            >>> R.var
+            [Cancer, Test]
+            >>> R.cpd[0]
+            0.2
+            >>> R.cond
+            [Cancer]
+            >>> R = T.query(query=[C], evidence=[T])
+            >>> R.name
+            'Conditional'
+            >>> R.var
+            [Test, Cancer]
+            >>> R.cpd[0]
+            0.9565217391304347
+            >>> R.cond
+            [Test]
+            >>> R = T.query(query=[C], evidence=[])
             >>> R.name
             'Marginal factor'
             >>> R.var
@@ -783,43 +868,13 @@ class Factor(object):
             [0.99, 0.010000000000000002]
         '''
 
-        if not query:
-            query = []
-        if not evidence:
-            evidence = {}
-
-        # TODO: furthermore: local inference
-        res = self.joint()
-        query_ = []
-        for query_var in query:
-            query_.append(query_var.var[-1])
-        evid_names = {}
-        for evid_name in evidence.keys():
-            evid_names[evid_name.var[-1]] = evidence[evid_name]
-        hiddens = set(res.var) - set(query_) - set(evid_names)
-        for hidden in hiddens:
-            res = res.marginal(hidden)
-        for evid_name in evid_names.keys():
-            res = res.reduce(var=evid_name, value=evid_names[evid_name])._norm()
-        return res
-
-    def query(self, query=None, evidence=None):
         if isinstance(evidence, dict):
-            return self._query3(query, evidence)
-        return self._query1(query, evidence)
-
-    def _query3(self, query=None, evidence=None):
-        if not query:
-            query = []
-        if not evidence:
-            evidence = {}
-
-        res = self._query1(query, evidence.keys())
-
-        for (var, val) in evidence.iteritems():
-            res = res.reduce(var=var.var[-1], value=val)
-
-        return res
+            res = self._query2(query, evidence.keys())
+            for (var, val) in evidence.iteritems():
+                res = res.reduce(var=var.var[-1], value=val)
+            return res
+        elif isinstance(evidence, list):
+            return self._query2(query, evidence)
 
     def _norm(self):
         '''
@@ -1003,6 +1058,21 @@ class TestFactor(unittest.TestCase):
         self.assertEqual(1, len(M.var))
         self.assertEqual('Test', M.var[0].name)
 
+    def testuncond_depth(self):
+        A = Factor(name='A', values=[0, 1], cpd=[0.2, 0.8])
+        B = Factor(name='B', values=[0, 1], cond=[A], cpd=[0.6, 0.4, 0.3, 0.7])
+        C = Factor(name='C', values=[0, 1], cond=[B], cpd=[0.6, 0.4, 0.3, 0.7])
+        D = Factor(name='D', values=[0, 1], cond=[C], cpd=[0.6, 0.4, 0.3, 0.7])
+        E = Factor(name='E', values=[0, 1], cond=[D], cpd=[0.6, 0.4, 0.3, 0.7])
+        F = Factor(name='F', values=[0, 1], cond=[E], cpd=[0.6, 0.4, 0.3, 0.7])
+        G = Factor(name='G', values=[0, 1], cond=[F], cpd=[0.6, 0.4, 0.3, 0.7])
+        M = G.uncond(depth=3)
+        self.assertEqual(2, len(M.cpd))
+        self.assertAlmostEqual(0.42915, M.cpd[0])
+        self.assertAlmostEqual(0.57085, M.cpd[1])
+        self.assertEqual(1, len(M.var))
+        self.assertEqual('G', M.var[0].name)
+
     def testquery(self):
         M = self.T.query(query=[self.C], evidence={self.T: 'pos'})
         self.assertEqual(2, len(M.cpd))
@@ -1010,6 +1080,23 @@ class TestFactor(unittest.TestCase):
         self.assertAlmostEqual(0.04347826086956522, M.cpd[1])
         self.assertEqual(1, len(M.var))
         self.assertEqual('Cancer', M.var[0].name)
+
+        M = self.T.query(query=[self.C], evidence={self.T: 'neg'})
+        self.assertEqual(2, len(M.cpd))
+        self.assertAlmostEqual(0.9987389659520807, M.cpd[0])
+        self.assertAlmostEqual(0.0012610340479192938, M.cpd[1])
+        self.assertEqual(1, len(M.var))
+        self.assertEqual('Cancer', M.var[0].name)
+
+        M = self.T.query(query=[self.C], evidence=[self.T])
+        self.assertEqual(4, len(M.cpd))
+        self.assertAlmostEqual(0.9565217391304348, M.cpd[0])
+        self.assertAlmostEqual(0.04347826086956522, M.cpd[1])
+        self.assertAlmostEqual(0.9987389659520807, M.cpd[2])
+        self.assertAlmostEqual(0.0012610340479192938, M.cpd[3])
+        self.assertEqual(2, len(M.var))
+        self.assertEqual('Test', M.var[0].name)
+        self.assertEqual('Cancer', M.var[1].name)
 
     def test_norm(self):
         M = self.T._norm()

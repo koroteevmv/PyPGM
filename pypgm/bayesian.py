@@ -1,4 +1,4 @@
-﻿import networkx as nx
+﻿##import networkx as nx
 
 class Bayesian(object):
     '''
@@ -18,13 +18,13 @@ class Bayesian(object):
         if not factors:
             factors = []
 
-        self.graph = nx.DiGraph()
+##        self.graph = nx.DiGraph()
         self.factors = factors
 
-        for factor in self.factors:
-            self.graph.add_node(factor.var[-1])
-            for parent in factor.parents:
-                self.graph.add_edge(parent.var[-1], factor.var[-1])
+##        for factor in self.factors:
+####            self.graph.add_node(factor.var[-1])
+##            for parent in factor.parents:
+##                self.graph.add_edge(parent.var[-1], factor.var[-1])
 
     def joint(self):
         '''
@@ -38,15 +38,15 @@ class Bayesian(object):
             res = fact*res
         return res
 
-    def draw(self):
-        '''
-        Syntax:
-
-        Arguments:
-
-        '''
-        pos = nx.pygraphviz_layout(self.graph, prog='dot')
-        nx.draw(self.graph, pos, node_shape='D')
+##    def draw(self):
+##        '''
+##        Syntax:
+##
+##        Arguments:
+##
+##        '''
+##        pos = nx.pygraphviz_layout(self.graph, prog='dot')
+##        nx.draw(self.graph, pos, node_shape='D')
 
 
 if __name__ == "__main__":
